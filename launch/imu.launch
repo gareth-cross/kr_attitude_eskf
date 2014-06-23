@@ -1,0 +1,18 @@
+<launch>
+
+  <!-- Launch the 3DM w/ only IMU data streaming -->
+  <include file="$(find imu_3dm_gx4)/launch/imu.launch">
+    <arg name="device" value="/dev/ttyACM0"/>
+    <arg name="imu_decimation" value="5"/>
+    <arg name="baudrate" value="921600"/>
+  </include>
+
+  <!-- Point the filter to the correct topics of the 3DM -->
+  <include file="$(find kr_attitude_eskf)/launch/attitude_eskf.launch">
+    <arg name="imu_topic" value="/imu_3dm_gx4/imu"/>
+    <arg name="field_topic" value="/imu_3dm_gx4/magnetic_field"/>
+    <arg name="enable_magnetometer" value="true"/>
+    <arg name="param_file" value="$(find kr_attitude_eskf)/config/params_gx4.yaml"/>
+  </include>
+
+</launch>
