@@ -41,7 +41,7 @@ The following topics are always published:
 |---|---|
 |`filtered_imu`|Filter orientation, covariance, IMU acceleration, and angular velocity (with bias subtracted).|
 |`bias`|Current estimate of gyroscope bias.|
-|`status`|Status of filter. See [Status.msg](Status.msg) for details.|
+|`status`|Status of filter. See `Status.msg` for details.|
 
 If `enable_magnetometer` is set, the following topics will also be published:
 
