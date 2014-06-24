@@ -5,11 +5,14 @@
   <!-- IMU topic to use -->
   <arg name="imu_topic" default="/imu/imu"/>
 
-  <!-- Magnetic field topic to use -->
+  <!-- Magnetic field topic to use, must be synchronized w/ IMU -->
   <arg name="field_topic" default="/imu/magnetic_field"/>
 
   <!-- Enable magnetometer -->
   <arg name="enable_magnetometer" default="false"/>
+
+  <!-- Calibrate magnetometer on launch -->
+  <arg name="calibrate_magnetometer" default="none"/>
 
   <!-- Parameters for ESKF -->
   <arg name="param_file" default="$(find kr_attitude_eskf)/config/params.yaml"/>
@@ -21,6 +24,7 @@
     <param name="imu_topic" type="string" value="$(arg imu_topic)"/>
     <param name="field_topic" type="string" value="$(arg field_topic)"/>
     <param name="enable_magnetometer" type="bool" value="$(arg enable_magnetometer)"/>
+    <param name="calibrate_magnetometer" type="string" value="$(arg calibrate_magnetometer)"/>
     <param name="broadcast_frame" type="bool" value="$(arg broadcast_frame)"/>
 
     <rosparam file="$(arg param_file)"/>

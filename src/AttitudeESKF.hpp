@@ -3,14 +3,14 @@
  *
  *  Copyright (c) 2013 Gareth Cross. All rights reserved.
  *
- *  This file is part of AttitudeESKF.
+ *  This file is part of kr_attitude_eskf.
  *
  *	Created on: 12/24/2013
  *		  Author: gareth
  */
 
-#ifndef __AttitudeESKF__
-#define __AttitudeESKF__
+#ifndef KR_ATTITUDE_ESKF_H_
+#define KR_ATTITUDE_ESKF_H_
 
 #include "quaternion.hpp"
 
@@ -18,127 +18,130 @@ namespace kr {
 
 /**
  *  @class AttitudeESKF
- *  @brief Implementation of an error-state EKF for attitude determination using Quaternions.
+ *  @brief Implementation of an error-state EKF for attitude determination using
+ * quaternions.
  *  @note Gravity and magnetic field are the supported reference vectors.
- *  @see 'Attitude Error Representations for Kalman Filtering', F. Landis Markley, JPL
+ *  @see 'Attitude Error Representations for Kalman Filtering', F. Landis
+ * Markley, JPL
  */
-class AttitudeESKF
-{
+class AttitudeESKF {
 public:
+  typedef double scalar_t; /**< Type used for all calculations, change as
+                              performance requires */
 
-  typedef double scalar_t;  /**< Type used for all calculations, change as performance requires */
-
-  typedef Eigen::Matrix<scalar_t,3,1> vec3; /**< Vector in R3 */
+  typedef Eigen::Matrix<scalar_t, 3, 1> vec3; /**< Vector in R3 */
 
   /**
-   * @brief The VarSettings struct
+   * @brief Describes all the sensor noise properties.
    */
   struct VarSettings {
-    scalar_t accel[3];  /// XYZ variance on acceleration, units of Gs
-    scalar_t gyro[3];   /// XYZ variance on gyroscope, units of rad/s
-    scalar_t mag[3];    /// XYZ variance on magnetometer, units of Gauss
+    scalar_t accel[3]; /// XYZ variance on acceleration, units of Gs
+    scalar_t gyro[3];  /// XYZ variance on gyroscope, units of rad/s
+    scalar_t mag[3];   /// XYZ variance on magnetometer, units of Gauss
 
     VarSettings() {
-      for (int i=0; i < 3; i++) {
+      for (int i = 0; i < 3; i++) {
         accel[i] = gyro[i] = mag[i] = 0.0;
       }
     }
   };
 
   /**
-   *  @brief Ctor, initializes state to all zeros
+   *  @brief Ctor, initializes state to all zeros.
    */
   AttitudeESKF();
 
   /**
-   *  @brief Perform the prediction step
-   *  @param wg Uncorrected gyroscope readings in body frame
-   *  @param time Current time in seconds
+   *  @brief predict Perform the prediction step.
+   *  @param wg Uncorrected gyroscope readings in body frame.
+   *  @param time Current time in seconds.
    *
    *  @note Integrates the nominal state using RK4.
    */
-  void predict(const vec3& wg, double time);
+  void predict(const vec3 &wg, double time);
 
   /**
-   *  @brief Perform the update step
-   *  @param ab Accelerometer reading in body frame (units of Gs)
+   *  @brief update Perform the update step.
+   *  @param ab Accelerometer reading in body frame (units of Gs).
    */
-  void update(const vec3& ab, const vec3& mb = vec3::Zero());
+  void update(const vec3 &ab, const vec3 &mb = vec3::Zero());
 
   /**
-   *	@brief Get Roll-Pitch-Yaw as a 3-element vector
+   *	@brief getRPY Get Roll-Pitch-Yaw as a 3-element vector.
    */
-  Eigen::Matrix<scalar_t,3,1> getRPY() const;
+  Eigen::Matrix<scalar_t, 3, 1> getRPY() const;
 
   /**
-   * @brief setEstimatesBias
-   * @param estBias
+   * @brief setEstimatesBias Enable/Disable bias estimation.
+   * @param estBias If true, bias is estimated online.
+   * @note Biases are estimated with a moving average filter when the platform is not in motion.
    */
   void setEstimatesBias(bool estBias) { estBias_ = estBias; }
 
   /**
-   * @brief setGyroBiasThreshold
-   * @param thresh
+   * @brief setGyroBiasThreshold Set the gyro bias threshold.
+   * @param thresh Threshold, units of rad/s.
+   * @note Below this threshold of rotation, gyro biases are estimated.
    */
   void setGyroBiasThreshold(scalar_t thresh) { biasThresh_ = thresh; }
 
   /**
-   * @brief setUsesMagnetometer
-   * @param useMag
+   * @brief setUsesMagnetometer Enable/disable magnetometer update.
+   * @param useMag If true, mag update is enabled.
    */
   void setUsesMagnetometer(bool useMag) { useMag_ = useMag; }
 
   /**
-   * @brief setVariances
-   * @param var
+   * @brief setVariances Set the process/measurement variances.
+   * @param var Instance of VarSettings.
    */
-  void setVariances(const VarSettings& var) { var_ = var; }
+  void setVariances(const VarSettings &var) { var_ = var; }
 
   /**
-   * @brief setMagneticReference
-   * @param magRef
+   * @brief setMagneticReference Set the magnetic reference vector.
+   * @param magRef Vector determining the North magnetic field.
    */
-  void setMagneticReference(const vec3& magRef) { magRef_ = magRef; }
+  void setMagneticReference(const vec3 &magRef) { magRef_ = magRef; }
 
   /**
-   * @brief getQuat
-   * @return
+   * @brief getQuat Get the state as a quaternion.
+   * @return Instance of kr::quat.
    */
-  const kr::quat<scalar_t>& getQuat() const { return q_; }
+  const kr::quat<scalar_t> &getQuat() const { return q_; }
 
   /**
-   * @brief getAngularVelocity
-   * @return
+   * @brief getAngularVelocity Get angular velocity (corrected for bias).
+   * @return Angular velocity in rad/s.
    */
-  const vec3& getAngularVelocity() const { return w_; }
+  const vec3 &getAngularVelocity() const { return w_; }
 
   /**
-   * @brief getGyroBias
-   * @return
+   * @brief getGyroBias Get the current gyro bias estimate.
+   * @return Gyro bias in units of rad/s.
    */
-  const vec3& getGyroBias() const { return b_; }
+  const vec3 &getGyroBias() const { return b_; }
 
   /**
-   * @brief getCovariance
-   * @return
+   * @brief getCovariance Get the system covariance on the error state.
+   * @return 3x3 covariance matrix.
    */
-  const Eigen::Matrix<scalar_t,3,3>& getCovariance() const { return P_; }
+  const Eigen::Matrix<scalar_t, 3, 3> &getCovariance() const { return P_; }
 
   /**
-   * @brief
-   * @return
+   * @brief getPredictedField Get the predicted magnetic field.
+   * @return The predicted magnetic field for the current state, units of gauss.
    */
-  const vec3& getPredictedField() const { return predMag_; }
+  const vec3 &getPredictedField() const { return predMag_; }
 
   /**
-   * @brief isStable
-   * @return
+   * @brief isStable Determine if the filter is stable.
+   * @return True if the Kalman gain was non-singular at the last update.
    */
   bool isStable() const { return isStable_; }
 
 private:
-  kr::quat<scalar_t> q_;           /// Orientation
-  Eigen::Matrix<scalar_t,3,3> P_;  /// System covariance
+  kr::quat<scalar_t> q_;            /// Orientation
+  Eigen::Matrix<scalar_t, 3, 3> P_; /// System covariance
   double lastTime_;
 
   vec3 w_;
@@ -146,7 +149,7 @@ private:
   unsigned long steadyCount_;
   scalar_t biasThresh_;
 
-  vec3 magRef_;  //  North
+  vec3 magRef_;
   vec3 predMag_;
 
   bool isStable_;
@@ -156,6 +159,6 @@ private:
   VarSettings var_;
 };
 
-}  // namespace kr
+} // namespace kr
 
-#endif /* defined(__AttitudeESKF__) */
+#endif /* defined(KR_ATTITUDE_ESKF_H_) */
