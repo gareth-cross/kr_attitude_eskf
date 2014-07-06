@@ -69,6 +69,9 @@ Vector3d magBias = Vector3d::Zero();
 Vector3d magScale = Vector3d::Ones();
 Vector3d magReference = Vector3d::Zero();
 
+//  last timestamp
+ros::Time prevStamp(0,0);
+
 void imu_callback(const sensor_msgs::ImuConstPtr &imu,
                   const sensor_msgs::MagneticFieldConstPtr &field) {
   Vector3d wm; //  measured angular rate
@@ -97,7 +100,12 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
     eskf.setUsesMagnetometer(false);
   }
 
-  eskf.predict(wm, imu->header.stamp.toSec());
+  if (prevStamp.sec != 0) {
+    double delta = imu->header.stamp.toSec() - prevStamp.toSec();
+    eskf.predict(wm, delta);
+  }
+  prevStamp = imu->header.stamp;
+  
   eskf.update(am, mm);
 
   const kr::quat<double> Q = eskf.getQuat(); //  updated quaternion
@@ -129,7 +137,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
           magScale = s;
           magBias = b;
         }
-        
+
         ROS_WARN("ref: %f, %f, %f", r[0], r[1], r[2]);
         magReference = r;
 
