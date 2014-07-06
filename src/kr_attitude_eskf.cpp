@@ -74,6 +74,7 @@ ros::Time prevStamp(0,0);
 
 void imu_callback(const sensor_msgs::ImuConstPtr &imu,
                   const sensor_msgs::MagneticFieldConstPtr &field) {
+
   Vector3d wm; //  measured angular rate
   Vector3d am; //  measured acceleration
   Vector3d mm; //  measured magnetic field
@@ -105,7 +106,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
     eskf.predict(wm, delta);
   }
   prevStamp = imu->header.stamp;
-  
+
   eskf.update(am, mm);
 
   const kr::quat<double> Q = eskf.getQuat(); //  updated quaternion
@@ -219,6 +220,7 @@ int main(int argc, char **argv) {
   message_filters::Subscriber<sensor_msgs::MagneticField> fieldSub;
   message_filters::TimeSynchronizer<
       sensor_msgs::Imu, sensor_msgs::MagneticField> sync(imuSub, fieldSub, 1);
+  ros::Subscriber imuSingleSub;
 
   //  find which topics to subscribe to
   std::string imu_topic, field_topic;
@@ -271,7 +273,7 @@ int main(int argc, char **argv) {
       pubField = nh->advertise<sensor_msgs::MagneticField>("adjusted_field", 1);
     } else {
       //  only subscribe to IMU
-      nh->subscribe<sensor_msgs::Imu>(
+      imuSingleSub = nh->subscribe<sensor_msgs::Imu>(
           imu_topic, 5,
           boost::bind(&imu_callback, _1, sensor_msgs::MagneticFieldConstPtr()));
     }
