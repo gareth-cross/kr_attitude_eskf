@@ -26,7 +26,7 @@ namespace kr {
  */
 class AttitudeESKF {
 public:
-  typedef float scalar_t; /**< Type used for all calculations, change as
+  typedef double scalar_t; /**< Type used for all calculations, change as
                               performance requires */
 
   typedef Eigen::Matrix<scalar_t, 3, 1> vec3; /**< Vector in R3 */

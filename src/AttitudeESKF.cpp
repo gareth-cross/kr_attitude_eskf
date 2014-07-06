@@ -102,9 +102,9 @@ void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb, AttitudeESKF::scalar_t 
 
   //	error-state jacobian
   Matrix<scalar_t, 3, 3> F = I3 - cross_skew<scalar_t>(w_ * dt);
-  
+
   //  integrate state and covariance
-  q_.integrateEuler(quat<scalar_t>(0, w_[0], w_[1], w_[2]), dt);
+  q_.integrateRungeKutta4(quat<scalar_t>(0, w_[0], w_[1], w_[2]), dt);
 
   P_ = F * P_ * F.transpose();
 
@@ -135,7 +135,7 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
     //  solve for the kalman gain
     Matrix<scalar_t, 3, 3> S = H * P_ * H.transpose();
     Matrix<scalar_t, 3, 3> Sinv;
-    
+
     for (int i = 0; i < 3; i++) {
       S(i, i) += var_.accel[i];
     }
@@ -150,7 +150,7 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
     Sinv = invert(S, det);
 
     const Matrix<scalar_t, 3, 3> K = P_ * H.transpose() * Sinv;
-    
+
     A = K * H;
     dx_ = K * r;
   }
