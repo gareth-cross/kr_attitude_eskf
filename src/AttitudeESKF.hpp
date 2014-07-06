@@ -26,7 +26,7 @@ namespace kr {
  */
 class AttitudeESKF {
 public:
-  typedef double scalar_t; /**< Type used for all calculations, change as
+  typedef float scalar_t; /**< Type used for all calculations, change as
                               performance requires */
 
   typedef Eigen::Matrix<scalar_t, 3, 1> vec3; /**< Vector in R3 */
@@ -41,7 +41,7 @@ public:
 
     VarSettings() {
       for (int i = 0; i < 3; i++) {
-        accel[i] = gyro[i] = mag[i] = 0.0;
+        accel[i] = gyro[i] = mag[i] = 0;
       }
     }
   };
@@ -54,22 +54,17 @@ public:
   /**
    *  @brief predict Perform the prediction step.
    *  @param wg Uncorrected gyroscope readings in body frame.
-   *  @param time Current time in seconds.
+   *  @param dt Time step in seconds.
    *
    *  @note Integrates the nominal state using RK4.
    */
-  void predict(const vec3 &wg, double time);
+  void predict(const vec3 &wg, scalar_t dt);
 
   /**
    *  @brief update Perform the update step.
    *  @param ab Accelerometer reading in body frame (units of Gs).
    */
   void update(const vec3 &ab, const vec3 &mb = vec3::Zero());
-
-  /**
-   *	@brief getRPY Get Roll-Pitch-Yaw as a 3-element vector.
-   */
-  Eigen::Matrix<scalar_t, 3, 1> getRPY() const;
 
   /**
    * @brief setEstimatesBias Enable/Disable bias estimation.
@@ -132,6 +127,12 @@ public:
    * @return The predicted magnetic field for the current state, units of gauss.
    */
   const vec3 &getPredictedField() const { return predMag_; }
+  
+  /**
+   *  @brief getCorrection Get the last correction (error state) generated.
+   *  @return The previous error state.
+   */
+  const vec3 &getCorrection() const { return dx_; }
 
   /**
    * @brief isStable Determine if the filter is stable.
@@ -142,7 +143,6 @@ public:
 private:
   kr::quat<scalar_t> q_;            /// Orientation
   Eigen::Matrix<scalar_t, 3, 3> P_; /// System covariance
-  double lastTime_;
 
   vec3 w_;
   vec3 b_;
@@ -151,6 +151,8 @@ private:
 
   vec3 magRef_;
   vec3 predMag_;
+  
+  vec3 dx_;
 
   bool isStable_;
   bool estBias_;
