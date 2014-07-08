@@ -12,7 +12,7 @@
 #ifndef KR_ATTITUDE_ESKF_H_
 #define KR_ATTITUDE_ESKF_H_
 
-#include "quaternion.hpp"
+#include <kr_math/quaternion.hpp>
 
 namespace kr {
 
@@ -127,7 +127,7 @@ public:
    * @return The predicted magnetic field for the current state, units of gauss.
    */
   const vec3 &getPredictedField() const { return predMag_; }
-  
+
   /**
    *  @brief getCorrection Get the last correction (error state) generated.
    *  @return The previous error state.
@@ -151,7 +151,7 @@ private:
 
   vec3 magRef_;
   vec3 predMag_;
-  
+
   vec3 dx_;
 
   bool isStable_;

@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include "quaternion.hpp"
+#include <kr_math/quaternion.hpp>
 
 namespace kr {
 

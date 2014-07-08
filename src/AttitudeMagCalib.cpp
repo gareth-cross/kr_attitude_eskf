@@ -10,7 +10,7 @@
  */
 
 #include "AttitudeMagCalib.hpp"
-#include "SO3.hpp"
+#include <kr_math/SO3.hpp>
 #include <cmath>
 
 using namespace std;
