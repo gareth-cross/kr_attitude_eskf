@@ -13,7 +13,7 @@ A 4th order Runge Kutta process model is employed, along with a classical EKF up
 
 ## Dependencies
 
-The core ESKF code depends only on `kr_math`. The ROS node depends on various other packages - these are listed in the manifest.
+The core ESKF code depends only on [kr_math](https://github.com/KumarRobotics/kr_math). The ROS node depends on various other packages - these are listed in the manifest.
 
 ## Parameters
 
