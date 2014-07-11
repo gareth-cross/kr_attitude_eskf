@@ -34,7 +34,7 @@ void AttitudeMagCalib::appendSample(const kr::quatd &att,
   bin.field = field;
   bin.q = att;
 
-  const Vector3d angs = kr::getRPY(att.toMatrix());
+  const Vector3d angs = kr::getRPY(att.matrix());
 
   //  map to bins
   int n_roll = std::floor((angs[0] + M_PI) / (2 * M_PI) * kBinMaxCount);
@@ -165,7 +165,7 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
 
   for (auto i = axes_[2].begin(); i != axes_[2].end(); i++) {
     //  tilt-compensate the components
-    const Matrix3d wRb = i->second.q.toMatrix();
+    const Matrix3d wRb = i->second.q.matrix();
     const Vector3d rpy = kr::getRPY(wRb);
     const Matrix3d tilt = kr::rotation_y(rpy[1]) * kr::rotation_x(rpy[0]);
 

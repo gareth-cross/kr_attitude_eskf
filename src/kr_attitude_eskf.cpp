@@ -167,10 +167,10 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
 
   tf::vectorEigenToMsg(w, filtImu.angular_velocity);
 
-  filtImu.orientation.w = Q.a();
-  filtImu.orientation.x = Q.b();
-  filtImu.orientation.y = Q.c();
-  filtImu.orientation.z = Q.d();
+  filtImu.orientation.w = Q.w();
+  filtImu.orientation.x = Q.x();
+  filtImu.orientation.y = Q.y();
+  filtImu.orientation.z = Q.z();
 
   //  append our covariance estimate to the new IMU message
   for (int i = 0; i < 3; i++) {
@@ -203,7 +203,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
   //  broadcast frame
   if (broadcast_frame) {
     tf::Transform transform;
-    transform.setRotation(tf::Quaternion(Q.b(), Q.c(), Q.d(), Q.a()));
+    transform.setRotation(tf::Quaternion(Q.x(), Q.y(), Q.z(), Q.w()));
     transform.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
 
     tfBroadcaster->sendTransform(tf::StampedTransform(
