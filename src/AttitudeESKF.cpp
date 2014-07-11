@@ -11,8 +11,6 @@
 
 #define NDEBUG
 
-#include <Eigen/Core>
-#include <Eigen/Dense>
 #include <Eigen/LU>
 
 #include "AttitudeESKF.hpp"
@@ -69,9 +67,71 @@ template <typename T> static inline T determinant(const Matrix<T, 3, 3> &A) {
          A(0, 2) * (A(1, 0) * A(2, 1) - A(1, 1) * A(2, 0));
 }
 
+//  Eigen does not define these operators, which we use for integration
+template <typename Scalar>
+static inline Eigen::Quaternion<Scalar> operator + (const Eigen::Quaternion<Scalar>& a,
+                                      const Eigen::Quaternion<Scalar>& b) {
+  return Eigen::Quaternion<Scalar>(a.w()+b.w(),
+                                   a.x()+b.x(),
+                                   a.y()+b.y(),
+                                   a.z()+b.z());
+}
+
+template <typename Scalar>
+static inline Eigen::Quaternion<Scalar> operator * (const Eigen::Quaternion<Scalar>& q,
+                                      Scalar s) {
+  return Eigen::Quaternion<Scalar>(q.w() * s,
+                                   q.x() * s,
+                                   q.y() * s,
+                                   q.z() * s);
+}
+
+/**
+ *  @brief Integrate a rotation quaterion using Euler integration
+ *  @param q Quaternion to integrate
+ *  @param w Angular velocity (body frame), stored in 3 complex terms
+ *  @param dt Time interval in seconds
+ *  @param normalize If True, quaternion is normalized after integration
+ */
+template <typename Scalar>
+static inline void integrateEuler(Eigen::Quaternion<Scalar> &q, Eigen::Quaternion<Scalar> &w, Scalar dt,
+                    bool normalize = true) {
+  q = q + (q * w * static_cast<Scalar>(0.5)) * dt;
+
+  if (normalize) {
+    q.normalize();
+  }
+}
+
+/**
+ *  @brief Integrate a rotation quaternion using 4th order Runge Kutta
+ *  @param q Quaternion to integrate
+ *  @param w Angular velocity (body frame), stored in 3 complex terms
+ *  @param dt Time interval in seconds
+ *  @param normalize If true, quaternion is normalized after integration
+ */
+template <typename Scalar>
+static inline void integrateRungeKutta4(Eigen::Quaternion<Scalar> &q, const Eigen::Quaternion<Scalar> &w, Scalar dt,
+                          bool normalize = true) {
+  const static Scalar half = static_cast<Scalar>(0.5);
+  const static Scalar two = static_cast<Scalar>(2);
+
+  Eigen::Quaternion<Scalar> qw = q * w * half;
+
+  Eigen::Quaternion<Scalar> k2 = (q + qw * dt * half) * w * half;
+  Eigen::Quaternion<Scalar> k3 = (q + k2 * dt * half) * w * half;
+  Eigen::Quaternion<Scalar> k4 = (q + k3 * dt) * w * half;
+
+  q = q + (qw + k2 * two + k3 * two + k4) * (dt / 6);
+
+  if (normalize) {
+    q.normalize();
+  }
+}
+
 AttitudeESKF::AttitudeESKF()
-    : q_(), steadyCount_(0), biasThresh_(0), isStable_(true) {
-  P_.setIdentity();
+    : q_(1,0,0,0), steadyCount_(0), biasThresh_(0), isStable_(true) {
+  P_.setZero();
   b_.setZero();
   w_.setZero();
   dx_.setZero();
@@ -83,7 +143,7 @@ AttitudeESKF::AttitudeESKF()
   useMag_ = false;
 }
 
-void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb, AttitudeESKF::scalar_t dt) {
+void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb, AttitudeESKF::scalar_t dt, bool useRK4) {
   static const Matrix<scalar_t, 3, 3> I3 =
       Matrix<scalar_t, 3, 3>::Identity(); //  identity R3
 
@@ -104,8 +164,13 @@ void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb, AttitudeESKF::scalar_t 
   Matrix<scalar_t, 3, 3> F = I3 - cross_skew<scalar_t>(w_ * dt);
 
   //  integrate state and covariance
-  q_.integrateRungeKutta4(quat<scalar_t>(0, w_[0], w_[1], w_[2]), dt);
-
+  Eigen::Quaternion<scalar_t> wQuat(0,w_[0],w_[1],w_[2]);
+  if (!useRK4) {
+    integrateEuler(q_, wQuat, dt, true);
+  } else {
+    integrateRungeKutta4(q_, wQuat, dt, true); 
+  }
+  
   P_ = F * P_ * F.transpose();
 
   for (int i = 0; i < 3; i++) {
@@ -117,7 +182,7 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
   Matrix<scalar_t, 3, 3> A;  //  for updating covariance
 
   //  rotation matrix: world -> body
-  const Matrix<scalar_t, 3, 3> bRw = q_.conjugate().toMatrix();
+  const Matrix<scalar_t, 3, 3> bRw = q_.conjugate().matrix();
 
   vec3 gravity;
   gravity[0] = 0.0;
@@ -203,6 +268,6 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
   //  perform state update
   P_ = (Matrix<scalar_t, 3, 3>::Identity() - A) * P_;
 
-  q_ = q_ * quat<scalar_t>(1.0, dx_[0], dx_[1], dx_[2]);
-  q_ /= q_.norm();
+  q_ = q_ * quat(1.0, dx_[0], dx_[1], dx_[2]);
+  q_.normalize();
 }
