@@ -12,7 +12,8 @@
 #ifndef KR_ATTITUDE_ESKF_H_
 #define KR_ATTITUDE_ESKF_H_
 
-#include <kr_math/quaternion.hpp>
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
 namespace kr {
 
@@ -30,6 +31,8 @@ public:
                               performance requires */
 
   typedef Eigen::Matrix<scalar_t, 3, 1> vec3; /**< Vector in R3 */
+  typedef Eigen::Matrix<scalar_t, 3, 3> mat3; /**< Matrix in R3 */
+  typedef Eigen::Quaternion<scalar_t> quat;   /**< S4 */
 
   /**
    * @brief Describes all the sensor noise properties.
@@ -55,10 +58,11 @@ public:
    *  @brief predict Perform the prediction step.
    *  @param wg Uncorrected gyroscope readings in body frame.
    *  @param dt Time step in seconds.
+   *  @param useRK4 If true, use RK4 integration - otherwise euler is used.
    *
    *  @note Integrates the nominal state using RK4.
    */
-  void predict(const vec3 &wg, scalar_t dt);
+  void predict(const vec3 &wg, scalar_t dt, bool useRK4=false);
 
   /**
    *  @brief update Perform the update step.
@@ -102,7 +106,7 @@ public:
    * @brief getQuat Get the state as a quaternion.
    * @return Instance of kr::quat.
    */
-  const kr::quat<scalar_t> &getQuat() const { return q_; }
+  const quat &getQuat() const { return q_; }
 
   /**
    * @brief getAngularVelocity Get angular velocity (corrected for bias).
@@ -141,8 +145,9 @@ public:
   bool isStable() const { return isStable_; }
 
 private:
-  kr::quat<scalar_t> q_;            /// Orientation
-  Eigen::Matrix<scalar_t, 3, 3> P_; /// System covariance
+    
+  quat q_; /// Orientation
+  mat3 P_; /// System covariance
 
   vec3 w_;
   vec3 b_;
