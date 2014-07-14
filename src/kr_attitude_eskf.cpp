@@ -223,12 +223,10 @@ int main(int argc, char **argv) {
   ros::Subscriber imuSingleSub;
 
   //  find which topics to subscribe to
-  std::string imu_topic, field_topic;
+  std::string imu_topic="imu", field_topic="field";
   std::string calibrate_mag;
   bool calib_requested = false;
 
-  nh->param("imu_topic", imu_topic, std::string("/imu/imu"));
-  nh->param("field_topic", field_topic, std::string("/imu/magnetic_field"));
   nh->param("enable_magnetometer", subscribe_mag, false);
   nh->param("calibrate_magnetometer", calibrate_mag, std::string("none"));
 
@@ -254,7 +252,7 @@ int main(int argc, char **argv) {
     return -1; // exit
   }
 
-  ROS_INFO("Subscribing to IMU: %s", imu_topic.c_str());
+  ROS_INFO("Subscribing to IMU: ~%s", imu_topic.c_str());
 
   //  filtered IMU output
   pubImu = nh->advertise<sensor_msgs::Imu>("filtered_imu", 1);
@@ -263,7 +261,7 @@ int main(int argc, char **argv) {
 
   try {
     if (subscribe_mag) {
-      ROS_INFO("Subscribing to magnetic field: %s", field_topic.c_str());
+      ROS_INFO("Subscribing to magnetic field: ~%s", field_topic.c_str());
 
       //  subscribe to indicated topics using tight timing
       imuSub.subscribe(*nh, imu_topic, 20);

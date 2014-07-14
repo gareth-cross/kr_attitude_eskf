@@ -13,7 +13,7 @@ A 4th order Runge Kutta process model is employed, along with a classical EKF up
 
 ## Dependencies
 
-The core ESKF code depends only on [kr_math](https://github.com/KumarRobotics/kr_math). The ROS node depends on various other packages - these are listed in the manifest.
+The core ESKF code depends on Eigen. The ROS node + magnetometer calibrator depends on [kr_math](https://github.com/KumarRobotics/kr_math) also.
 
 ## Parameters
 
@@ -21,8 +21,6 @@ The ROS implementation exposes several parameters:
 
 |Parameter|Definition|Default|
 |---|---|---|
-|`imu_topic`|Topic to subscribe to for IMU data.|`/imu/imu`|
-|`field_topic`|Topic to subscribe to for magnetic data.|`/imu/magnetic_field`|
 |`enable_magnetometer`|If true, magnetometer readings are included in the state estimation update.|`false`|
 |`calibrate_magnetometer`|Type of calibration - see below.|`"none"`|
 |`broadcast_frame`|If true, the TF frame for the body to world transform is broadcast.|`false`|
@@ -32,6 +30,8 @@ The ROS implementation exposes several parameters:
 |`mag_calib/bias/[x,y,z]`|Bias of the magnetometer.|`0`|
 |`mag_calib/scale/[x,y,z]`|Scale of the magnetometer.|`1`|
 |`mag_calib/reference/[x,y,z]`|World frame reference vector of the magnetometer.|`0`|
+
+When using the node, you should remap `~imu` and `~field` to the appropriate topics. See `attitude_eskf.launch` for an example.
 
 ## Topics
 
