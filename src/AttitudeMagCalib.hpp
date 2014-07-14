@@ -13,6 +13,7 @@
 #define KR_ATTITUDE_MSG_CALIB_H_
 
 #include <unordered_map>
+#include <vector>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
