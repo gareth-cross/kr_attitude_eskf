@@ -1,5 +1,0 @@
-<launch>
-  <node name="imu_to_pose" pkg="kr_attitude_eskf" type="imu_to_pose.py" output="screen">
-    <remap from="~imu" to="/attitude_eskf_post/filtered_imu"/>
-  </node>
-</launch>
