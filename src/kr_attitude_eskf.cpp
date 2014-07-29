@@ -15,6 +15,7 @@
 #include <sensor_msgs/FluidPressure.h>
 
 #include <geometry_msgs/Vector3Stamped.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <eigen_conversions/eigen_msg.h>
 
@@ -46,15 +47,17 @@ ros::Publisher pubImu;
 ros::Publisher pubBias;
 ros::Publisher pubField;
 ros::Publisher pubStatus;
+ros::Publisher pubPose;
 
 ros::NodeHandlePtr nh; //  main node handle
 
 const std::string sfx[] = { "x", "y", "z" }; //  suffixes to parameter names
 
-//  for broadcasting body frame
 boost::shared_ptr<tf::TransformBroadcaster> tfBroadcaster;
-std::string bodyFrameName;
 bool broadcast_frame = false;
+
+std::string bodyFrameName;  //  name of frame_id
+bool publish_pose = false;
 
 enum {
   MagIdle = 0,
@@ -160,6 +163,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
   //  publish IMU topic
   sensor_msgs::Imu filtImu;
   filtImu.header.stamp = ros::Time::now();
+  filtImu.header.frame_id = bodyFrameName;
 
   filtImu.linear_acceleration = imu->linear_acceleration;
   filtImu.linear_acceleration_covariance = imu->linear_acceleration_covariance;
@@ -183,12 +187,14 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
   //  publish bias
   geometry_msgs::Vector3Stamped bias;
   bias.header.stamp = filtImu.header.stamp;
+  bias.header.frame_id = bodyFrameName;
   tf::vectorEigenToMsg(eskf.getGyroBias(), bias.vector);
   pubBias.publish(bias);
 
   //  publish status
   kr_attitude_eskf::Status status;
   status.header.stamp = filtImu.header.stamp;
+  status.header.frame_id = "0";
   status.magStatus = topicMode;
   pubStatus.publish(status);
 
@@ -196,10 +202,20 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
   if (subscribe_mag) {
     sensor_msgs::MagneticField fieldOut;
     fieldOut.header.stamp = filtImu.header.stamp;
+    fieldOut.header.frame_id = bodyFrameName;
     tf::vectorEigenToMsg(mm, fieldOut.magnetic_field);
     pubField.publish(fieldOut);
   }
 
+  if (publish_pose) {
+    geometry_msgs::PoseStamped pose;
+    pose.header.stamp = filtImu.header.stamp;
+    pose.pose.orientation = filtImu.orientation;
+    pose.pose.position.x = pose.pose.position.y = pose.pose.position.z = 0;
+    pose.header.frame_id = bodyFrameName;
+    pubPose.publish(pose);
+  }
+  
   //  broadcast frame
   if (broadcast_frame) {
     tf::Transform transform;
@@ -207,7 +223,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
     transform.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
 
     tfBroadcaster->sendTransform(tf::StampedTransform(
-        transform, filtImu.header.stamp, "fixedFrame", bodyFrameName));
+        transform, filtImu.header.stamp, "/world", bodyFrameName));
   }
 }
 
@@ -285,9 +301,14 @@ int main(int argc, char **argv) {
   kr::AttitudeESKF::VarSettings var;
   double gyro_bias_thresh;
 
-  //  load all parameters
+  //  load all remaining parameters
   nh->param("broadcast_frame", broadcast_frame, false);
-
+  nh->param("publish_pose", publish_pose, false);
+  
+  if (publish_pose) {
+    pubPose = nh->advertise<geometry_msgs::PoseStamped>("pose", 1);
+  }
+  
   //  noise parameters
   for (int i = 0; i < 3; i++) {
     nh->param("noise_std/accel/" + sfx[i], var.accel[i], 1.0);
@@ -324,12 +345,14 @@ int main(int argc, char **argv) {
   eskf.setEstimatesBias(true);
   eskf.setGyroBiasThreshold(gyro_bias_thresh);
 
+  //  frame_id used for measurements
+  bodyFrameName = ros::this_node::getName() + "/bodyFrame";
+  
   if (broadcast_frame) {
     tfBroadcaster = boost::shared_ptr<tf::TransformBroadcaster>(
         new tf::TransformBroadcaster());
-    bodyFrameName = ros::this_node::getName() + "/bodyFrame";
   }
-
+ 
   ros::spin();
   return 0;
 }
