@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>kr_attitude_eskf</name>
-  <version>0.0.5</version>
+  <version>0.0.6</version>
   <description>Error state kalman filter for attitude determination</description>
 
   <maintainer email="gcross.code@icloud.com">gcross</maintainer>
