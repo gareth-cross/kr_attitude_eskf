@@ -162,7 +162,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
 
   //  publish IMU topic
   sensor_msgs::Imu filtImu;
-  filtImu.header.stamp = ros::Time::now();
+  filtImu.header.stamp = imu->header.stamp;
   filtImu.header.frame_id = bodyFrameName;
 
   filtImu.linear_acceleration = imu->linear_acceleration;
