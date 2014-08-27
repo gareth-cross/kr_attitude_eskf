@@ -25,7 +25,7 @@ set(RELEVANT_LIBRARIES krAttitudeESKF ${roscpp_LIBRARIES} ${galt_common_LIBRARIE
  ${tf_LIBRARIES} ${eigen_conversions_LIBRARIES} ${message_filters_LIBRARIES})
 
 # rigorous error checking
-add_definitions("-Wall -Werror -DATTITUDE_ESKF_BUILD_MAG")
+add_definitions("-Wall -Werror -DATTITUDE_ESKF_BUILD_MAG -O3")
 
 # build main filter
 add_executable(${PROJECT_NAME} src/kr_attitude_eskf.cpp)

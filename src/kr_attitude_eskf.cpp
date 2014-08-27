@@ -21,6 +21,7 @@
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_datatypes.h>
@@ -34,6 +35,8 @@
 
 #include <algorithm>
 #include <string>
+
+#define kROSQueueSize   (100)
 
 using namespace std;
 using namespace Eigen;
@@ -58,6 +61,8 @@ bool broadcast_frame = false;
 
 std::string bodyFrameName;  //  name of frame_id
 bool publish_pose = false;
+
+bool initialized = false;
 
 enum {
   MagIdle = 0,
@@ -104,13 +109,26 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
     eskf.setUsesMagnetometer(false);
   }
 
-  if (prevStamp.sec != 0) {
-    double delta = imu->header.stamp.toSec() - prevStamp.toSec();
-    eskf.predict(wm, delta);
-  }
-  prevStamp = imu->header.stamp;
-
-  eskf.update(am, mm);
+  //if (!initialized) {
+  //  if (am.norm() > 0 && mm.norm() > 0) {
+  //    eskf.initialize(am,mm);
+  //    initialized = true;
+  //  }
+  //} else {
+    if (prevStamp.sec != 0) {
+      double delta = imu->header.stamp.toSec() - prevStamp.toSec();
+      eskf.predict(wm, delta);
+    }
+    prevStamp = imu->header.stamp;
+    eskf.update(am, mm);
+    if (!initialized) {
+      //  force it to converge early by iterating
+      for (int i=0; i < 10; i++) {
+        eskf.update(am, mm);
+      }
+      initialized = true;
+    }
+  //}
 
   const kr::quat<double> Q = eskf.getQuat(); //  updated quaternion
   const kr::AttitudeESKF::vec3 w =
@@ -234,8 +252,11 @@ int main(int argc, char **argv) {
   //  synchronized subscribers
   message_filters::Subscriber<sensor_msgs::Imu> imuSub;
   message_filters::Subscriber<sensor_msgs::MagneticField> fieldSub;
-  message_filters::TimeSynchronizer<
-      sensor_msgs::Imu, sensor_msgs::MagneticField> sync(imuSub, fieldSub, 1);
+  
+  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Imu,
+      sensor_msgs::MagneticField> TimeSyncPolicy;
+  
+  message_filters::Synchronizer<TimeSyncPolicy> sync(TimeSyncPolicy(kROSQueueSize), imuSub, fieldSub);
   ros::Subscriber imuSingleSub;
 
   //  find which topics to subscribe to
@@ -280,15 +301,15 @@ int main(int argc, char **argv) {
       ROS_INFO("Subscribing to magnetic field: ~%s", field_topic.c_str());
 
       //  subscribe to indicated topics using tight timing
-      imuSub.subscribe(*nh, imu_topic, 20);
-      fieldSub.subscribe(*nh, field_topic, 20);
+      imuSub.subscribe(*nh, imu_topic, kROSQueueSize);
+      fieldSub.subscribe(*nh, field_topic, kROSQueueSize);
       sync.registerCallback(boost::bind(&imu_callback, _1, _2));
 
       pubField = nh->advertise<sensor_msgs::MagneticField>("adjusted_field", 1);
     } else {
       //  only subscribe to IMU
       imuSingleSub = nh->subscribe<sensor_msgs::Imu>(
-          imu_topic, 5,
+          imu_topic, kROSQueueSize,
           boost::bind(&imu_callback, _1, sensor_msgs::MagneticFieldConstPtr()));
     }
   }

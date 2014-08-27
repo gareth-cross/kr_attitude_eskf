@@ -271,3 +271,34 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
   q_ = q_ * quat(1.0, dx_[0], dx_[1], dx_[2]);
   q_.normalize();
 }
+
+void AttitudeESKF::initialize(const vec3& ab, const vec3& mb) {
+  
+  const scalar_t anorm = ab.norm();
+  vec3 vg = ab.cross(vec3(0,0,1));
+  scalar_t vgnorm = vg.norm();
+  vg /= vgnorm; //  normalize rotation vector
+  
+  //  rotation from body to world about roll-pitch axes
+  const scalar_t th1 = std::asin(vgnorm / anorm);
+  const quat wQb_rp(Eigen::AngleAxis<scalar_t>(th1, vg).matrix());
+  
+  if (!useMag_) {
+    //  cannot initialize yaw
+    q_ = wQb_rp;
+  } else {
+    //  magnetic field, yaw rotation only
+    const vec3 my = wQb_rp.matrix() * mb;
+    
+    vg = magRef_.cross(my);
+    vgnorm = vg.norm();
+    vg /= vgnorm;
+    vgnorm /= (magRef_.norm() * mb.norm());
+   
+    const scalar_t th2 = std::asin(vgnorm);
+    const quat wQb_y(Eigen::AngleAxis<scalar_t>(th2, vg).matrix());
+    
+    //  initial guess for orientation
+    q_ = wQb_y * wQb_rp;
+  }
+}
