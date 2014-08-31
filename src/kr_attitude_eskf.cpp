@@ -56,9 +56,6 @@ ros::NodeHandlePtr nh; //  main node handle
 
 const std::string sfx[] = { "x", "y", "z" }; //  suffixes to parameter names
 
-boost::shared_ptr<tf::TransformBroadcaster> tfBroadcaster;
-bool broadcast_frame = false;
-
 std::string bodyFrameName;  //  name of frame_id
 bool publish_pose = false;
 
@@ -233,16 +230,6 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
     pose.header.frame_id = bodyFrameName;
     pubPose.publish(pose);
   }
-  
-  //  broadcast frame
-  if (broadcast_frame) {
-    tf::Transform transform;
-    transform.setRotation(tf::Quaternion(Q.x(), Q.y(), Q.z(), Q.w()));
-    transform.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-
-    tfBroadcaster->sendTransform(tf::StampedTransform(
-        transform, filtImu.header.stamp, "/world", bodyFrameName));
-  }
 }
 
 int main(int argc, char **argv) {
@@ -323,7 +310,6 @@ int main(int argc, char **argv) {
   double gyro_bias_thresh;
 
   //  load all remaining parameters
-  nh->param("broadcast_frame", broadcast_frame, false);
   nh->param("publish_pose", publish_pose, false);
   
   if (publish_pose) {
@@ -369,11 +355,6 @@ int main(int argc, char **argv) {
   //  frame_id used for measurements
   bodyFrameName = ros::this_node::getName() + "/bodyFrame";
   
-  if (broadcast_frame) {
-    tfBroadcaster = boost::shared_ptr<tf::TransformBroadcaster>(
-        new tf::TransformBroadcaster());
-  }
- 
   ros::spin();
   return 0;
 }

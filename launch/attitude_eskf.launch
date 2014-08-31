@@ -17,13 +17,9 @@
   <!-- Parameters for ESKF -->
   <arg name="param_file" default="$(find kr_attitude_eskf)/config/params.yaml"/>
 
-  <!-- Broadcast the TF -->
-  <arg name="broadcast_frame" default="true"/>
-
   <node pkg="kr_attitude_eskf" name="$(arg eskf_node)" type="kr_attitude_eskf" output="screen">
     <param name="enable_magnetometer" type="bool" value="$(arg enable_magnetometer)"/>
     <param name="calibrate_magnetometer" type="string" value="$(arg calibrate_magnetometer)"/>
-    <param name="broadcast_frame" type="bool" value="$(arg broadcast_frame)"/>
 
     <remap from="~imu" to="$(arg imu_topic)"/>
     <remap from="~field" to="$(arg field_topic)"/>
