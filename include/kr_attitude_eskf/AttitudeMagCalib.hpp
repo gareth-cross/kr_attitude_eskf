@@ -14,9 +14,6 @@
 
 #include <unordered_map>
 #include <vector>
-#include <Eigen/Core>
-#include <Eigen/Dense>
-
 #include <kr_math/base_types.hpp>
 
 namespace kr {

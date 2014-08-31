@@ -28,8 +28,8 @@
 
 #include <kr_attitude_eskf/Status.h>
 
-#include "AttitudeESKF.hpp"
-#include "AttitudeMagCalib.hpp"
+#include "kr_attitude_eskf/AttitudeESKF.hpp"
+#include "kr_attitude_eskf/AttitudeMagCalib.hpp"
 
 #include <kr_math/SO3.hpp>
 
@@ -86,7 +86,18 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
 
   tf::vectorMsgToEigen(imu->angular_velocity, wm);
   tf::vectorMsgToEigen(imu->linear_acceleration, am);
-
+  //  copy covariances from message to matrix
+  kr::AttitudeESKF::mat3 wCov, aCov, mCov = kr::AttitudeESKF::mat3::Zero();
+  for (int i=0; i < 3; i++) {
+    for (int j=0; j < 3; j++) {
+      wCov(i,j) = imu->angular_velocity_covariance[i*3 + j];
+      aCov(i,j) = imu->linear_acceleration_covariance[i*3 + j];
+      if (field) {
+        mCov(i,j) = field->magnetic_field_covariance[i*3 + j];
+      }
+    }
+  }
+  
   if (subscribe_mag) {
     tf::vectorMsgToEigen(field->magnetic_field, mm);
   } else {
@@ -114,17 +125,10 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
   //} else {
     if (prevStamp.sec != 0) {
       double delta = imu->header.stamp.toSec() - prevStamp.toSec();
-      eskf.predict(wm, delta);
+      eskf.predict(wm, delta, wCov);
     }
     prevStamp = imu->header.stamp;
-    eskf.update(am, mm);
-    if (!initialized) {
-      //  force it to converge early by iterating
-      for (int i=0; i < 10; i++) {
-        eskf.update(am, mm);
-      }
-      initialized = true;
-    }
+    eskf.update(am, aCov, mm, mCov);
   //}
 
   const kr::quat<double> Q = eskf.getQuat(); //  updated quaternion
@@ -176,16 +180,12 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu,
   }
 
   //  publish IMU topic
-  sensor_msgs::Imu filtImu;
+  sensor_msgs::Imu filtImu = *imu;
   filtImu.header.stamp = imu->header.stamp;
-  filtImu.header.frame_id = bodyFrameName;
-
-  filtImu.linear_acceleration = imu->linear_acceleration;
-  filtImu.linear_acceleration_covariance = imu->linear_acceleration_covariance;
-  filtImu.angular_velocity_covariance = imu->angular_velocity_covariance;
-
+  filtImu.header.seq = 0;
+  //  output angular velocity minus the bias estimate
   tf::vectorEigenToMsg(w, filtImu.angular_velocity);
-
+  //  filter orientation
   filtImu.orientation.w = Q.w();
   filtImu.orientation.x = Q.x();
   filtImu.orientation.y = Q.y();
@@ -306,23 +306,15 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  kr::AttitudeESKF::VarSettings var;
   double gyro_bias_thresh;
 
   //  load all remaining parameters
   nh->param("publish_pose", publish_pose, false);
+  nh->param("gyro_bias_thresh", gyro_bias_thresh, 1e-2); //  rad/s
   
   if (publish_pose) {
     pubPose = nh->advertise<geometry_msgs::PoseStamped>("pose", 1);
   }
-  
-  //  noise parameters
-  for (int i = 0; i < 3; i++) {
-    nh->param("noise_std/accel/" + sfx[i], var.accel[i], 1.0);
-    nh->param("noise_std/gyro/" + sfx[i], var.gyro[i], 0.001);
-    nh->param("noise_std/mag/" + sfx[i], var.mag[i], 0.1);
-  }
-  nh->param("gyro_bias_thresh", gyro_bias_thresh, 1e-2); //  rad/s
 
   if (subscribe_mag) {
     if (calib_requested) {
@@ -348,10 +340,14 @@ int main(int argc, char **argv) {
   }
 
   //  configure noise parameters
-  eskf.setVariances(var);
   eskf.setEstimatesBias(true);
   eskf.setGyroBiasThreshold(gyro_bias_thresh);
 
+  //  initialize covariance to something large
+  for (int i=0; i < 3; i++) {
+    eskf.getCovariance()(i,i) = 1.0;  //  ~std of 60 degrees on all axes
+  }
+  
   //  frame_id used for measurements
   bodyFrameName = ros::this_node::getName() + "/bodyFrame";
   

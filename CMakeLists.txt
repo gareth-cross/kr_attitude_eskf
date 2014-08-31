@@ -22,12 +22,19 @@ link_directories(${Boost_LIBRARY_DIR})
 include_directories(${Boost_INCLUDE_DIR})
 
 # include headers
-include_directories(${kr_math_INCLUDE_DIRS})
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+  include
+)
 
 # build shared library
-add_library(krAttitudeESKF src/AttitudeESKF.cpp src/AttitudeMagCalib.cpp)
+add_library(krAttitudeESKF
+  src/AttitudeESKF.cpp
+  src/AttitudeMagCalib.cpp
+)
 
-set(RELEVANT_LIBRARIES krAttitudeESKF
+set(RELEVANT_LIBRARIES
+  krAttitudeESKF
   ${catkin_LIBRARIES}
 )
 

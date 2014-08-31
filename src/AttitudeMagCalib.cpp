@@ -9,13 +9,13 @@
  *		  Author: gareth
  */
 
-#include "AttitudeMagCalib.hpp"
+#include <kr_attitude_eskf/AttitudeMagCalib.hpp>
 #include <kr_math/SO3.hpp>
 #include <cmath>
 
-using namespace std;
 using namespace Eigen;
-using namespace kr;
+
+namespace kr {
 
 AttitudeMagCalib::AttitudeMagCalib() { reset(); }
 
@@ -183,3 +183,5 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
   ref_[2] = vAvg / axes_[2].size();
   calibrated_ = true;
 }
+
+} //  namespace kr

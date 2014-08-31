@@ -1,0 +1,23 @@
+<launch>
+  <!-- Start IMU -->
+  <include file="$(find galt_setup)/launch/imu_3dm_gx4.launch"/>
+
+  <!-- Add covariance -->
+  <node pkg="imu_covariance" name="imu_covariance" type="imu_covariance"
+    output="screen">
+    <param name="config_path" type="string" value="$(find imu_covariance)/config/sample.yml"/>
+    <remap from="~imu_in" to="/imu/imu"/>
+    <remap from="~magnetic_field_in" to="/imu/magnetic_field"/>
+    <remap from="~pressure_in" to="/imu/pressure"/>
+  </node>
+
+  <!-- Launch filter -->
+  <node pkg="kr_attitude_eskf" name="attitude_eskf" type="kr_attitude_eskf" output="screen">
+    <param name="enable_magnetometer" type="bool" value="false"/>
+    <param name="calibrate_magnetometer" type="string" value="none"/>
+    <param name="gyro_bias_thresh" type="double" value="0.01"/>
+
+    <remap from="~imu" to="/imu_covariance/imu"/>
+    <remap from="~field" to="/imu_covariance/magnetic_field"/>
+  </node>
+</launch>
