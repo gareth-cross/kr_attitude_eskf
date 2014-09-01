@@ -41,6 +41,8 @@ The ROS implementation exposes several parameters:
 |`mag_calib/bias`|Bias of the magnetometer.|`[0,0,0]`|
 |`mag_calib/scale`|Scale of the magnetometer.|`[1,1,1]`|
 |`mag_calib/reference`|World frame reference vector of the magnetometer.|`[0,0,0]`|
+|`process_scale_factor`|'Fudge factor' to multiply by incoming gyro covariances.|1|
+|`gyro_bias_thresh`|Threshold of motion below which we may estimate gyro bias.|0.01 rad/s|
 
 When using the node, you should remap `~imu` and `~field` to the appropriate topics. See `attitude_eskf.launch` for an example.
 

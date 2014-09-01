@@ -58,6 +58,7 @@ private:
   //  options
   bool enableMag_;
   double gyroBiasThresh_;
+  double processScaleFactor_;
   
   //  implementation
   kr::vec3d magBias_;
@@ -71,6 +72,7 @@ private:
     Calibrating = 1,
     CalibrationComplete = 2,
   } calibState_;
+  int initCount_;
   
   //  callbacks
   void inputCallback(const sensor_msgs::ImuConstPtr&,

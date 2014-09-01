@@ -19,11 +19,12 @@ namespace kr_attitude_eskf {
 
 Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh), 
   sync_(TimeSyncPolicy(kROSQueueSize), subImu_, subField_), 
-  calibState_(Uncalibrated) {
+  calibState_(Uncalibrated), initCount_(0) {
  
   //  load settings
   nh_.param("enable_magnetometer", enableMag_, false);
-  nh_.param("gyro_bias_thresh",  gyroBiasThresh_, 0.01);
+  nh_.param("gyro_bias_thresh", gyroBiasThresh_, 0.01);
+  nh_.param("process_scale_factor", processScaleFactor_, 1.0);
   //  load magnetometer calibration
   magBias_.setZero();
   magScale_.setConstant(1);
@@ -76,7 +77,7 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   pubBias_ = nh_.advertise<geometry_msgs::Vector3Stamped>("bias", 1);
   pubPose_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
   //  'unbiased' and scaled magnetic field
-  pubField_ = nh_.advertise<geometry_msgs::Vector3Stamped>("corrected_field",1);
+  pubField_ = nh_.advertise<sensor_msgs::MagneticField>("corrected_field",1);
   
   //  register for service callback
   ros::NodeHandle publicNh(nh);
@@ -86,7 +87,7 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   //  configure filter
   eskf_.setEstimatesBias(true);
   eskf_.setGyroBiasThreshold(gyroBiasThresh_);
-  eskf_.getCovariance().setIdentity();  //  ~60deg std. on each axis
+  initCount_ = 10;
 }
 
 void Node::saveCalibration() {
@@ -133,6 +134,7 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
       }
     }
   }
+  wCov *= processScaleFactor_;  //  apply fudge factor
   
   if (enableMag_ && calibState_==CalibrationComplete) {
     //  correct magnetic field
@@ -150,6 +152,11 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     //  run kalman filter
     const double delta = imuMsg->header.stamp.toSec() - prevStamp_.toSec();
     eskf_.predict(wm, delta, wCov);
+    if (initCount_ > 0) {
+      //  inject artificial covariance in our state
+      eskf_.getCovariance() += kr::mat3d::Identity();
+      initCount_--;
+    }
     eskf_.update(am, aCov, mm, mCov);
     
     const kr::quatd wQb = eskf_.getQuat();          // updated quaternion
@@ -182,7 +189,7 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
             enableMag_ = true;
             //  add some variance to our state estimate so the mag correction
             //  takes effect
-            eskf_.getCovariance().noalias() += kr::mat3d::Identity();
+            initCount_ = 10;
           }
           catch (std::exception& e) {
             ROS_ERROR("Calibration failed: %s", e.what());    
@@ -213,9 +220,9 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     pose.header = imu.header;
     pose.pose.orientation = imu.orientation;
     
-    geometry_msgs::Vector3Stamped field;
-    field.header = imu.header;
-    tf::vectorEigenToMsg(mm, field.vector);
+    sensor_msgs::MagneticField field = *magMsg;
+    field.header.seq = 0;
+    tf::vectorEigenToMsg(mm, field.magnetic_field);
     if (enableMag_) {
       pubField_.publish(field);
     }

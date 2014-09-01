@@ -16,6 +16,7 @@
     <param name="enable_magnetometer" type="bool" value="true"/>
     <param name="calibrate_magnetometer" type="string" value="none"/>
     <param name="gyro_bias_thresh" type="double" value="0.01"/>
+    <param name="process_scale_factor" type="double" value="1"/>
 
     <remap from="~imu" to="/imu_covariance/imu"/>
     <remap from="~magnetic_field" to="/imu_covariance/magnetic_field"/>
