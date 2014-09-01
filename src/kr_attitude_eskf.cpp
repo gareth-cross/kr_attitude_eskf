@@ -13,8 +13,9 @@
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "kr_attitude_eskf");
-  ros::NodeHandle nh("~");
-  kr_attitude_eskf::Node node(nh);
+  ros::NodeHandle nh;
+  ros::NodeHandle pnh("~");
+  kr_attitude_eskf::Node node(nh,pnh);
   ros::spin();
   return 0;
 }

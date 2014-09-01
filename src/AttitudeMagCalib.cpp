@@ -20,9 +20,8 @@ namespace kr {
 AttitudeMagCalib::AttitudeMagCalib() { reset(); }
 
 void AttitudeMagCalib::reset() {
-  for (int i = 0; i < 3; i++) {
-    axes_[i].clear();
-  }
+  binH_.clear();
+  binV_.clear();
   calibrated_ = false;
   bias_.setZero();
   scale_.setOnes();
@@ -36,38 +35,51 @@ void AttitudeMagCalib::appendSample(const kr::quatd &att,
   
   const kr::vec3d localG = att.conjugate().matrix() * kr::vec3d(0,0,1);
   
-  if (std::abs(localG[2]) < 0.2) {
+  //  determine local angle
+  if (std::abs(localG[2]) < 0.1) {
     //  world vertical is approx. in the local X/Y plane
-    
-  } else if (std::abs(localG[2]) > 0.8) {
+    const kr::vec3d worldZ = att.matrix() * kr::vec3d(0,0,1);
+    const double ang = std::atan2(worldZ[1], worldZ[0]); 
+    const int key = (ang + M_PI) / (2*M_PI) * kBinMaxCount;
+    binV_[key] = bin;
+  } else if (std::abs(localG[2]) > 0.9) {
     //  world vertical is approx. vertical
-    
+    const kr::vec3d worldX = att.matrix() * kr::vec3d(1,0,0);
+    const double ang = std::atan2(worldX[1], worldX[0]);
+    const int key = (ang + M_PI) / (2*M_PI) * kBinMaxCount;
+    binH_[key] = bin;
   }
   
-  const Vector3d angs = kr::getRPY(att.matrix());
+//  const Vector3d angs = kr::getRPY(att.matrix());
 
-  //  map to bins
-  int n_roll = std::floor((angs[0] + M_PI) / (2 * M_PI) * kBinMaxCount);
-  int n_pitch = std::floor((angs[1] + M_PI / 2) / M_PI * kBinMaxCount);
-  int n_yaw = std::floor((angs[2] + M_PI) / (2 * M_PI) * kBinMaxCount);
+//  //  map to bins
+//  int n_roll = std::floor((angs[0] + M_PI) / (2 * M_PI) * kBinMaxCount);
+//  int n_pitch = std::floor((angs[1] + M_PI / 2) / M_PI * kBinMaxCount);
+//  int n_yaw = std::floor((angs[2] + M_PI) / (2 * M_PI) * kBinMaxCount);
 
-  if (axes_[0].find(n_roll) == axes_[0].end() || 
-      axes_[1].find(n_pitch) == axes_[1].end() ||
-      axes_[2].find(n_yaw) == axes_[2].end()) {
-    printf("%f, %f, %f\n", field[0], field[1], field[2]);
-  }
+//  if (axes_[0].find(n_roll) == axes_[0].end() || 
+//      axes_[1].find(n_pitch) == axes_[1].end() ||
+//      axes_[2].find(n_yaw) == axes_[2].end()) {
+//    printf("%f, %f, %f\n", field[0], field[1], field[2]);
+//  }
   
-  axes_[0][n_roll] = bin;
-  axes_[1][n_pitch] = bin;
-  axes_[2][n_yaw] = bin;
+//  axes_[0][n_roll] = bin;
+//  axes_[1][n_pitch] = bin;
+//  axes_[2][n_yaw] = bin;
 }
 
 bool AttitudeMagCalib::isReady() const {
   //  must collect 90% of samples to be ready
-  for (int i = 0; i < 3; i++) {
-    if (axes_[i].size() < kBinMaxCount * 9 / 10) {
-      return false;
-    }
+//  for (int i = 0; i < 3; i++) {
+//    if (axes_[i].size() < kBinMaxCount * 9 / 10) {
+//      return false;
+//    }
+//  }
+  if (binV_.size() < kBinMaxCount*8/10) {
+    return false;
+  }
+  if (binH_.size() < kBinMaxCount*8/10) {
+    return false;
   }
   return true;
 }
@@ -85,13 +97,36 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
     Vector3d bias, scl = Vector3d::Ones();
 
     std::vector<Vector3d> meas;
-    for (int i = 0; i < 3; i++) {
-      for (const auto &s : axes_[i]) {
-        meas.push_back(s.second.field);
-      }
+    for (const std::pair<int, SampleBin>& s : binH_) {
+      printf("%f, %f, %f\n", s.second.field[0], s.second.field[1], s.second.field[2]);
+      meas.push_back(s.second.field);
     }
+    for (const std::pair<int, SampleBin>&s : binV_) {
+      printf("%f, %f, %f\n", s.second.field[0], s.second.field[1], s.second.field[2]);
+      meas.push_back(s.second.field);
+    }
+//    for (int i = 0; i < 3; i++) {
+//      for (const auto &s : axes_[i]) {
+//        meas.push_back(s.second.field);
+//      }
+//    }
     const size_t N = meas.size();
 
+    //  fit to sphere
+    MatrixXd A(N, 4);
+    VectorXd b(N, 1);
+    for (size_t i=0; i < meas.size(); i++) {
+      A(i,0) = 2*meas[i][0];
+      A(i,1) = 2*meas[i][1];
+      A(i,2) = 2*meas[i][2];
+      A(i,3) = 1;
+      b(i,0) = meas[i][0]*meas[i][0] + meas[i][1]*meas[i][1] + 
+          meas[i][2]*meas[i][2];
+    }
+    //  solve system for center
+    const Vector4d x = A.colPivHouseholderQr().solve(b);
+    bias = x.block<3,1>(0,0);
+    
     Vector3d max, min, mean;
     min.setConstant(3, std::numeric_limits<double>::infinity());
     max = -min;
@@ -104,22 +139,22 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
       mean_rad += r;
       mean_rad_sqr += r * r;
 
-      for (int i = 0; i < 3; i++) {
-        max[i] = std::max(max[i], v[i]);
-        min[i] = std::min(min[i], v[i]);
-      }
+//      for (int i = 0; i < 3; i++) {
+//        max[i] = std::max(max[i], v[i]);
+//        min[i] = std::min(min[i], v[i]);
+//      }
 
-      mean += v;
+//      mean += v;
     }
-    mean /= N;
+    //mean /= N;
     mean_rad /= N;
     mean_rad_sqr /= N;
 
-    const float var = mean_rad_sqr - mean_rad * mean_rad;
-    const float den = std::sqrt(2 * M_PI * var);
+    //const float var = mean_rad_sqr - mean_rad * mean_rad;
+    //const float den = std::sqrt(2 * M_PI * var);
 
     //  initial estimate of the bias
-    bias = (max + min) * 0.25 + mean * 0.5;
+   // bias = (max + min) * 0.25 + mean * 0.5;
 
     //  refine with GN-NLS
     Matrix<double, Eigen::Dynamic, 6> J(N, 6);
@@ -127,11 +162,11 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
     MatrixXd W;
 
     //  calculate weights
-    W.resize(N, N);
+    W.resize(N,N);
     W.setZero();
     for (size_t i = 0; i < N; i++) {
-      const double r = meas[i].norm();
-      W(i, i) = std::exp(-0.5 * (r - mean_rad) * (r - mean_rad) / var) / den;
+      //const double r = meas[i].norm();
+      W(i, i) = 1;//std::exp(-0.5 * (r - mean_rad) * (r - mean_rad) / var) / den;
     }
 
     for (int iter = 0; iter < 10; iter++) {
@@ -179,24 +214,38 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
   //  calculate the magnetic reference vector using the yaw samples
   double hAvg = 0.0, vAvg = 0.0;
 
-  for (auto i = axes_[2].begin(); i != axes_[2].end(); i++) {
-    //  tilt-compensate the components
-    const Matrix3d wRb = i->second.q.matrix();
-    const Vector3d rpy = kr::getRPY(wRb);
-    const Matrix3d tilt = kr::rotation_y(rpy[1]) * kr::rotation_x(rpy[0]);
-
-    Vector3d level = tilt * i->second.field;
-    for (int j = 0; j < 3; j++) {
-      level[j] = (level[j] - bias_[j]) / scale_[j];
+  for (const std::pair<int,SampleBin>& p : binH_) {
+    const kr::mat3d wRb = p.second.q.matrix();
+    const kr::vec3d rpy = kr::getRPY(wRb);
+    const kr::mat3d tilt = kr::rotation_y(rpy[1]) * kr::rotation_y(rpy[0]);
+    kr::vec3d level = tilt * p.second.field;
+    level -= bias_;
+    for (int i=0; i < 3; i++) {
+      level[i] /= scale_[i];
     }
-
-    hAvg += std::sqrt(level[0] * level[0] + level[1] * level[1]);
+    
+    hAvg += std::sqrt(level[0]*level[0] + level[1]*level[1]);
     vAvg += level[2];
   }
+  
+//  for (auto i = axes_[2].begin(); i != axes_[2].end(); i++) {
+//    //  tilt-compensate the components
+//    const Matrix3d wRb = i->second.q.matrix();
+//    const Vector3d rpy = kr::getRPY(wRb);
+//    const Matrix3d tilt = kr::rotation_y(rpy[1]) * kr::rotation_x(rpy[0]);
+
+//    Vector3d level = tilt * i->second.field;
+//    for (int j = 0; j < 3; j++) {
+//      level[j] = (level[j] - bias_[j]) / scale_[j];
+//    }
+
+//    hAvg += std::sqrt(level[0] * level[0] + level[1] * level[1]);
+//    vAvg += level[2];
+//  }
 
   ref_[0] = 0;
-  ref_[1] = hAvg / axes_[2].size(); //  Y = North
-  ref_[2] = vAvg / axes_[2].size();
+  ref_[1] = hAvg / binH_.size(); //  Y = North
+  ref_[2] = vAvg / binH_.size();
   calibrated_ = true;
 }
 

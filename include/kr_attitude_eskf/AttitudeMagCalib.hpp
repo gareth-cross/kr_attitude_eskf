@@ -12,7 +12,7 @@
 #ifndef KR_ATTITUDE_MSG_CALIB_H_
 #define KR_ATTITUDE_MSG_CALIB_H_
 
-#include <unordered_map>
+#include <map>
 #include <vector>
 #include <kr_math/base_types.hpp>
 
@@ -98,14 +98,15 @@ public:
   const Eigen::Vector3d& getReference() const { return ref_; }
 
 private:
-  constexpr static int kBinMaxCount = 33;   /// Number of samples to take on each axis
+  constexpr static int kBinMaxCount = 30;   /// Number of samples to take on each axis
 
   struct SampleBin {
     Eigen::Vector3d field; ///  Field measured in this sample
     kr::quatd q;           ///  Unreferenced quaternion for this sample
   };
 
-  std::unordered_map<int, SampleBin> axes_[3];
+  std::map<int, SampleBin> binV_;
+  std::map<int, SampleBin> binH_;
   bool calibrated_;
 
   Eigen::Vector3d bias_;

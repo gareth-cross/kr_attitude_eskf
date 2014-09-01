@@ -17,7 +17,7 @@
 
 namespace kr_attitude_eskf {
 
-Node::Node(const ros::NodeHandle &nh) : nh_(nh), 
+Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh), 
   sync_(TimeSyncPolicy(kROSQueueSize), subImu_, subField_), 
   calibState_(Uncalibrated) {
  
@@ -76,6 +76,11 @@ Node::Node(const ros::NodeHandle &nh) : nh_(nh),
   pubBias_ = nh_.advertise<geometry_msgs::Vector3Stamped>("bias", 1);
   pubPose_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
   
+  //  register for service callback
+  ros::NodeHandle publicNh(nh);
+  srvCalibrate_ = publicNh.advertiseService(ros::this_node::getName() + "/begin_calibration", 
+                                            &Node::beginCalibration, this);
+  
   //  configure filter
   eskf_.setEstimatesBias(true);
   eskf_.setGyroBiasThreshold(gyroBiasThresh_);
@@ -123,7 +128,6 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     eskf_.setUsesMagnetometer(false);
   }
   
-  static ros::Time firstTime = imuMsg->header.stamp;
   if (prevStamp_.sec != 0) {
     //  run kalman filter
     const double delta = imuMsg->header.stamp.toSec() - prevStamp_.toSec();
@@ -133,18 +137,34 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     const kr::quatd wQb = eskf_.getQuat();          // updated quaternion
     const kr::vec3d w = eskf_.getAngularVelocity(); // ang vel. minus bias
    
-    if (calibState_ == Calibrating || true) {
-      //  update the calibrator   
-      if ((imuMsg->header.stamp - firstTime).toSec() > 5) {
+    if (calibState_ == Calibrating) {
+      //  update the calibrator
+      if (!calib_.isCalibrated()) {
         calib_.appendSample(wQb, mm);
+        if (calib_.isReady()) {
+          ROS_INFO("Collected sufficient samples. Calibrating...");
+          //  calibrate bias, scale and reference vector
+          try {
+            calib_.calibrate(kr::AttitudeMagCalib::FullCalibration);
+            
+            ROS_INFO_STREAM("Bias: " << calib_.getBias().transpose());
+            ROS_INFO_STREAM("Scale: " << calib_.getScale().transpose());
+            ROS_INFO_STREAM("Reference: " << calib_.getReference().transpose());
+            
+            magBias_ = calib_.getBias();
+            magScale_ = calib_.getScale();
+            magReference_ = calib_.getReference();
+            //  done, we can use this new calibration immediately
+            calibState_ = CalibrationComplete;
+            enableMag_ = true;
+            //  add some variance to our state estimate
+            eskf_.getCovariance().noalias() += kr::mat3d::Identity();
+          }
+          catch (std::exception& e) {
+            ROS_ERROR("Calibration failed: %s", e.what());    
+          }
+        }
       }
-      
-//      if (calib_.isReady()) {
-        
-        
-//        //  calibrate bias, scale and reference vector
-//        calib_.calibrate(kr::AttitudeMagCalib::FullCalibration);
-//      }
     }
     
     sensor_msgs::Imu imu = *imuMsg;
@@ -174,6 +194,14 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     pubPose_.publish(pose);
   }
   prevStamp_ = imuMsg->header.stamp;
+}
+
+bool Node::beginCalibration(std_srvs::Empty::Request&,
+                            std_srvs::Empty::Response&) {
+  //  enter calibration mode
+  calibState_ = Calibrating;
+  ROS_INFO("Entering calibration mode.");
+  return true;
 }
 
 }

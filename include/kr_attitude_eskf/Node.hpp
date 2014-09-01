@@ -15,6 +15,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/MagneticField.h>
+#include <std_srvs/Empty.h>
 #include <diagnostic_updater/diagnostic_updater.h>
 #include <diagnostic_updater/publisher.h>
 #include <message_filters/synchronizer.h>
@@ -29,7 +30,7 @@ namespace kr_attitude_eskf {
 
 class Node {
 public:
-  Node(const ros::NodeHandle& nh);
+  Node(const ros::NodeHandle& nh, const ros::NodeHandle& pnh);
   
 private:
   static constexpr unsigned int kROSQueueSize = 100;
@@ -38,6 +39,7 @@ private:
   ros::Publisher pubImu_;
   ros::Publisher pubBias_;
   ros::Publisher pubPose_;
+  ros::ServiceServer srvCalibrate_;
   
   //  subsribers
   message_filters::Subscriber<sensor_msgs::Imu> subImu_;
@@ -69,6 +71,9 @@ private:
   //  callbacks
   void inputCallback(const sensor_msgs::ImuConstPtr&,
                      const sensor_msgs::MagneticFieldConstPtr&);
+  
+  bool beginCalibration(std_srvs::Empty::Request&,
+                        std_srvs::Empty::Response&);
 };
 
 } //  namespace kr_attitude_eskf

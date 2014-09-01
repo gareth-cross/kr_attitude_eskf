@@ -11,11 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_updater
 )
 
-# generate messages
-add_message_files(FILES Status.msg)
-generate_messages(DEPENDENCIES std_msgs)
-
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS message_runtime
+)
 
 # include boost
 find_package(Boost REQUIRED)
