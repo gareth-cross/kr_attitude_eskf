@@ -164,7 +164,7 @@ void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb,
   w_ = (wb - b_); //	true gyro reading
 
   //	error-state jacobian
-  Matrix<scalar_t, 3, 3> F = I3 - crossSkew<scalar_t>(w_ * dt);
+  const Matrix<scalar_t, 3, 3> F = I3 - crossSkew<scalar_t>(w_ * dt);
 
   //  integrate state and covariance
   Eigen::Quaternion<scalar_t> wQuat(0, w_[0], w_[1], w_[2]);
@@ -267,37 +267,6 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
 
   q_ = q_ * quat(1.0, dx_[0]*0.5, dx_[1]*0.5, dx_[2]*0.5);
   q_.normalize();
-}
-
-void AttitudeESKF::initialize(const vec3& ab, const vec3& mb) {
-  
-  const scalar_t anorm = ab.norm();
-  vec3 vg = ab.cross(vec3(0,0,1));
-  scalar_t vgnorm = vg.norm();
-  vg /= vgnorm; //  normalize rotation vector
-  
-  //  rotation from body to world about roll-pitch axes
-  const scalar_t th1 = std::asin(vgnorm / anorm);
-  const quat wQb_rp(Eigen::AngleAxis<scalar_t>(th1, vg).matrix());
-  
-  if (!useMag_) {
-    //  cannot initialize yaw
-    q_ = wQb_rp;
-  } else {
-    //  magnetic field, yaw rotation only
-    const vec3 my = wQb_rp.matrix() * mb;
-    
-    vg = magRef_.cross(my);
-    vgnorm = vg.norm();
-    vg /= vgnorm;
-    vgnorm /= (magRef_.norm() * mb.norm());
-   
-    const scalar_t th2 = std::asin(vgnorm);
-    const quat wQb_y(Eigen::AngleAxis<scalar_t>(th2, vg).matrix());
-    
-    //  initial guess for orientation
-    q_ = wQb_y * wQb_rp;
-  }
 }
 
 } //  namespace kr

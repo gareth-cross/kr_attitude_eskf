@@ -62,16 +62,6 @@ public:
               const mat3 &aCov,
               const vec3 &mb = vec3::Zero(),
               const mat3 &mCov = mat3::Zero());
-
-  /**
-   * @brief Initialize the filter using two first measurements.
-   * @param ab Accelerometer reading in body frame (units of Gs).
-   * @param mb Magnetic field vector in body frame (units of Gauss).
-   * @note The behaviour of this method is undefined if the norm of ab is zero,
-   * or if the norm of mb is zero (in the case where the magnetometer is
-   * enabled).
-   */
-  void initialize(const vec3& ab, const vec3& mb = vec3::Zero());
   
   /**
    * @brief setEstimatesBias Enable/Disable bias estimation.

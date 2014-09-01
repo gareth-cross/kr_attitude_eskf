@@ -75,6 +75,8 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   pubImu_ = nh_.advertise<sensor_msgs::Imu>("filtered_imu", 1);
   pubBias_ = nh_.advertise<geometry_msgs::Vector3Stamped>("bias", 1);
   pubPose_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
+  //  'unbiased' and scaled magnetic field
+  pubField_ = nh_.advertise<geometry_msgs::Vector3Stamped>("corrected_field",1);
   
   //  register for service callback
   ros::NodeHandle publicNh(nh);
@@ -85,6 +87,22 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   eskf_.setEstimatesBias(true);
   eskf_.setGyroBiasThreshold(gyroBiasThresh_);
   eskf_.getCovariance().setIdentity();  //  ~60deg std. on each axis
+}
+
+void Node::saveCalibration() {
+  std::vector<double> vec(3);
+  vec[0] = magBias_[0];
+  vec[1] = magBias_[1];
+  vec[2] = magBias_[2];
+  nh_.setParam("mag_calib/bias", vec);
+  vec[0] = magScale_[0];
+  vec[1] = magScale_[1];
+  vec[2] = magScale_[2];
+  nh_.setParam("mag_calib/scale", vec);
+  vec[0] = magReference_[0];
+  vec[1] = magReference_[1];
+  vec[2] = magReference_[2];
+  nh_.setParam("mag_calib/reference", vec);
 }
 
 void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
@@ -154,10 +172,16 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
             magBias_ = calib_.getBias();
             magScale_ = calib_.getScale();
             magReference_ = calib_.getReference();
+            
+            //  save to rosparam
+            nh_.setParam("enable_magnetometer", true);
+            saveCalibration();
+            
             //  done, we can use this new calibration immediately
             calibState_ = CalibrationComplete;
             enableMag_ = true;
-            //  add some variance to our state estimate
+            //  add some variance to our state estimate so the mag correction
+            //  takes effect
             eskf_.getCovariance().noalias() += kr::mat3d::Identity();
           }
           catch (std::exception& e) {
@@ -189,6 +213,13 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     pose.header = imu.header;
     pose.pose.orientation = imu.orientation;
     
+    geometry_msgs::Vector3Stamped field;
+    field.header = imu.header;
+    tf::vectorEigenToMsg(mm, field.vector);
+    if (enableMag_) {
+      pubField_.publish(field);
+    }
+    
     pubImu_.publish(imu);
     pubBias_.publish(bias);
     pubPose_.publish(pose);
@@ -200,6 +231,7 @@ bool Node::beginCalibration(std_srvs::Empty::Request&,
                             std_srvs::Empty::Response&) {
   //  enter calibration mode
   calibState_ = Calibrating;
+  calib_.reset();
   ROS_INFO("Entering calibration mode.");
   return true;
 }

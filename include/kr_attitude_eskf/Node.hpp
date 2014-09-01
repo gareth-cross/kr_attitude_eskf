@@ -32,6 +32,9 @@ class Node {
 public:
   Node(const ros::NodeHandle& nh, const ros::NodeHandle& pnh);
   
+  //  save calibration to rosparam
+  void saveCalibration();
+  
 private:
   static constexpr unsigned int kROSQueueSize = 100;
   
@@ -39,6 +42,7 @@ private:
   ros::Publisher pubImu_;
   ros::Publisher pubBias_;
   ros::Publisher pubPose_;
+  ros::Publisher pubField_;
   ros::ServiceServer srvCalibrate_;
   
   //  subsribers

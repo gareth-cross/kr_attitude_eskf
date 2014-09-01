@@ -98,7 +98,7 @@ public:
   const Eigen::Vector3d& getReference() const { return ref_; }
 
 private:
-  constexpr static int kBinMaxCount = 30;   /// Number of samples to take on each axis
+  constexpr static int kBinMaxCount = 40;   /// Number of samples to take on each axis
 
   struct SampleBin {
     Eigen::Vector3d field; ///  Field measured in this sample
