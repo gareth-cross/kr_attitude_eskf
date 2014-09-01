@@ -13,11 +13,11 @@
 
   <!-- Launch filter -->
   <node pkg="kr_attitude_eskf" name="attitude_eskf" type="kr_attitude_eskf" output="screen">
-    <param name="enable_magnetometer" type="bool" value="false"/>
+    <param name="enable_magnetometer" type="bool" value="true"/>
     <param name="calibrate_magnetometer" type="string" value="none"/>
     <param name="gyro_bias_thresh" type="double" value="0.01"/>
 
     <remap from="~imu" to="/imu_covariance/imu"/>
-    <remap from="~field" to="/imu_covariance/magnetic_field"/>
+    <remap from="~magnetic_field" to="/imu_covariance/magnetic_field"/>
   </node>
 </launch>

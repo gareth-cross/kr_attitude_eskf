@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   eigen_conversions
   kr_math
+  diagnostic_updater
 )
 
 # generate messages
@@ -42,7 +43,10 @@ set(RELEVANT_LIBRARIES
 add_definitions("-Wall -Werror -DATTITUDE_ESKF_BUILD_MAG -O3 -std=c++11")
 
 # build main filter
-add_executable(${PROJECT_NAME} src/kr_attitude_eskf.cpp)
+add_executable(${PROJECT_NAME}
+  src/kr_attitude_eskf.cpp
+  src/Node.cpp
+)
 target_link_libraries(${PROJECT_NAME} ${RELEVANT_LIBRARIES})
 
 # ensures messages are generated before hand

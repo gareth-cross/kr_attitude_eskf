@@ -33,7 +33,17 @@ void AttitudeMagCalib::appendSample(const kr::quatd &att,
   SampleBin bin;
   bin.field = field;
   bin.q = att;
-
+  
+  const kr::vec3d localG = att.conjugate().matrix() * kr::vec3d(0,0,1);
+  
+  if (std::abs(localG[2]) < 0.2) {
+    //  world vertical is approx. in the local X/Y plane
+    
+  } else if (std::abs(localG[2]) > 0.8) {
+    //  world vertical is approx. vertical
+    
+  }
+  
   const Vector3d angs = kr::getRPY(att.matrix());
 
   //  map to bins
@@ -41,6 +51,12 @@ void AttitudeMagCalib::appendSample(const kr::quatd &att,
   int n_pitch = std::floor((angs[1] + M_PI / 2) / M_PI * kBinMaxCount);
   int n_yaw = std::floor((angs[2] + M_PI) / (2 * M_PI) * kBinMaxCount);
 
+  if (axes_[0].find(n_roll) == axes_[0].end() || 
+      axes_[1].find(n_pitch) == axes_[1].end() ||
+      axes_[2].find(n_yaw) == axes_[2].end()) {
+    printf("%f, %f, %f\n", field[0], field[1], field[2]);
+  }
+  
   axes_[0][n_roll] = bin;
   axes_[1][n_pitch] = bin;
   axes_[2][n_yaw] = bin;
@@ -178,8 +194,8 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
     vAvg += level[2];
   }
 
-  ref_[0] = hAvg / axes_[2].size();
-  ref_[1] = 0;
+  ref_[0] = 0;
+  ref_[1] = hAvg / axes_[2].size(); //  Y = North
   ref_[2] = vAvg / axes_[2].size();
   calibrated_ = true;
 }
