@@ -12,6 +12,7 @@ kr_attitude_eskf is an implementation of the Error-State Kalman Filter described
   - Magnetic bias/scale/reference vectors are loaded as lists instead of key-value arrays.
   - Magnetometer calibration now uses least squares for initial guess, and LM iteration is robustified with Cauchy weighting.
   - Calibration is triggered by a callable ROS service, instead of from the launch file options.
+  - Added support for `diagnostic_updater`.
   - Renamed `adjusted_field` topic to `corrected_field`.
   - Refactored ROS code into a Node class.
   - Removed `broadcast_frame` option and `tf`-dependent code.

@@ -79,6 +79,14 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   //  'unbiased' and scaled magnetic field
   pubField_ = nh_.advertise<sensor_msgs::MagneticField>("corrected_field",1);
   
+  //  register updater
+  if (!nh_.hasParam("diagnostic_period")) {
+    nh_.setParam("diagnostic_period", 0.2);
+  }
+  updater_.setHardwareID(ros::this_node::getName());
+  updater_.add("diagnostic_info", 
+               boost::bind(&Node::diagnosticCallback, this, _1));
+  
   //  register for service callback
   ros::NodeHandle publicNh(nh);
   srvCalibrate_ = publicNh.advertiseService(ros::this_node::getName() + "/begin_calibration", 
@@ -232,6 +240,7 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     pubPose_.publish(pose);
   }
   prevStamp_ = imuMsg->header.stamp;
+  updater_.update();
 }
 
 bool Node::beginCalibration(std_srvs::Empty::Request&,
@@ -241,6 +250,30 @@ bool Node::beginCalibration(std_srvs::Empty::Request&,
   calib_.reset();
   ROS_INFO("Entering calibration mode.");
   return true;
+}
+
+void 
+Node::diagnosticCallback(diagnostic_updater::DiagnosticStatusWrapper &stat) {
+  
+  stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "Running");
+  
+  stat.add("Magnetometer enabled:", enableMag_);
+  stat.add("Gyro bias threshold:", gyroBiasThresh_);
+  stat.add("Process scale factor:", processScaleFactor_);
+  std::stringstream ss;
+  //  current bias estimate
+  ss << eskf_.getGyroBias().transpose();
+  stat.add("Gyroscope bias:", ss.str());
+  //  mag calib state
+  std::string calib;
+  if (calibState_ == Uncalibrated) {
+    calib = "Uncalibrated";
+  } else if (calibState_ == Calibrating) {
+    calib = "Calibrating";
+  } else {
+    calib = "Complete";
+  }
+  stat.add("Calibration state:", calib);
 }
 
 }

@@ -55,6 +55,9 @@ private:
     sensor_msgs::MagneticField> TimeSyncPolicy;
   message_filters::Synchronizer<TimeSyncPolicy> sync_;
   
+  //  diagnostic updater
+  diagnostic_updater::Updater updater_;
+  
   //  options
   bool enableMag_;
   double gyroBiasThresh_;
@@ -74,12 +77,17 @@ private:
   } calibState_;
   int initCount_;
   
+  static_assert(std::is_same<kr::AttitudeESKF::scalar_t,double>::value,
+                "This node should only be compiled using double precision.");
+  
   //  callbacks
   void inputCallback(const sensor_msgs::ImuConstPtr&,
                      const sensor_msgs::MagneticFieldConstPtr&);
   
   bool beginCalibration(std_srvs::Empty::Request&,
                         std_srvs::Empty::Response&);
+  
+  void diagnosticCallback(diagnostic_updater::DiagnosticStatusWrapper &stat);
 };
 
 } //  namespace kr_attitude_eskf
