@@ -13,6 +13,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <kr_math/SO3.hpp>
 #include <assert.h>
 
 namespace kr_attitude_eskf {
@@ -95,7 +96,7 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   //  configure filter
   eskf_.setEstimatesBias(true);
   eskf_.setGyroBiasThreshold(gyroBiasThresh_);
-  initCount_ = 10;
+  initCount_ = 100;
 }
 
 void Node::saveCalibration() {
@@ -124,6 +125,8 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
   kr::vec3d am; //  measured acceleration
   kr::vec3d mm; //  measured magnetic field
 
+  //std::cout << mm.transpose() << std::endl;
+  
   tf::vectorMsgToEigen(imuMsg->angular_velocity, wm);
   tf::vectorMsgToEigen(imuMsg->linear_acceleration, am);
   if (magMsg) {
@@ -197,7 +200,7 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
             enableMag_ = true;
             //  add some variance to our state estimate so the mag correction
             //  takes effect
-            initCount_ = 10;
+            initCount_ = 50;
           }
           catch (std::exception& e) {
             ROS_ERROR("Calibration failed: %s", e.what());    
@@ -205,6 +208,13 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
         }
       }
     }
+
+//    const kr::vec3d derot = eskf_.getPredictedField();
+//    static ros::Publisher pubDebug = nh_.advertise<geometry_msgs::Vector3Stamped>("predicted", 1);
+//    geometry_msgs::Vector3Stamped vec;
+//    tf::vectorEigenToMsg(derot, vec.vector);
+//    vec.header.stamp = imuMsg->header.stamp;
+//    pubDebug.publish(vec);
     
     sensor_msgs::Imu imu = *imuMsg;
     imu.header.seq = 0;

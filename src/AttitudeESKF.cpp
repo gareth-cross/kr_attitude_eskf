@@ -15,6 +15,7 @@
 
 #include <kr_attitude_eskf/AttitudeESKF.hpp>
 #include <Eigen/LU>
+#include <iostream>
 
 using namespace Eigen;
 
@@ -225,6 +226,10 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
     vec3 field = bRw * magRef_;
     predMag_ = field;
 
+    //std::cout << "Ref: " << magRef_.transpose() << std::endl;
+    //std::cout << "Pred: " << predMag_.transpose() << std::endl;
+    ///std::cout << "Meas: " << mb.transpose() << std::endl;
+    
     Matrix<scalar_t, 6, 1> r;
     r.block<3, 1>(0, 0) = ab - aPred;
     r.block<3, 1>(3, 0) = mb - field;

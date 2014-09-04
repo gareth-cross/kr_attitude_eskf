@@ -167,13 +167,12 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
   //  calculate the magnetic reference vector using the yaw samples
   double hAvg = 0.0, vAvg = 0.0;
   
-  //printf("Level values:\n");
   for (const std::pair<int,SampleBin>& p : binH_) {
     const kr::mat3d wRb = p.second.q.matrix();
     const kr::vec3d rpy = kr::getRPY(wRb);
     const kr::mat3d tilt = kr::rotation_y(rpy[1]) * kr::rotation_x(rpy[0]);
     kr::vec3d level = tilt * p.second.field;
-    //printf("%f, %f, %f\n", level[0], level[1], level[2]);
+        
     level -= bias_;
     for (int i=0; i < 3; i++) {
       level[i] /= scale_[i];
@@ -185,7 +184,7 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
   
   ref_[0] = 0;
   ref_[1] = hAvg / binH_.size(); //  Y = North
-  ref_[2] = vAvg / binH_.size();
+  ref_[2] = -std::abs(vAvg) / binH_.size();
   calibrated_ = true;
 }
 
