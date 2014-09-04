@@ -30,24 +30,9 @@ public:
   typedef double scalar_t; /**< Type used for all calculations, change as
                               performance requires */
 
-  typedef Eigen::Matrix<scalar_t, 3, 1> vec3; /**< Vector in R3 */
-  typedef Eigen::Matrix<scalar_t, 3, 3> mat3; /**< Matrix in R3 */
-  typedef Eigen::Quaternion<scalar_t> quat;   /**< S4 */
-
-  /**
-   * @brief Describes all the sensor noise properties.
-   */
-  struct VarSettings {
-    scalar_t accel[3]; /// XYZ variance on acceleration, units of Gs
-    scalar_t gyro[3];  /// XYZ variance on gyroscope, units of rad/s
-    scalar_t mag[3];   /// XYZ variance on magnetometer, units of Gauss
-
-    VarSettings() {
-      for (int i = 0; i < 3; i++) {
-        accel[i] = gyro[i] = mag[i] = 0;
-      }
-    }
-  };
+  typedef Eigen::Matrix<scalar_t, 3, 1> vec3; /// Vector in R3
+  typedef Eigen::Matrix<scalar_t, 3, 3> mat3; /// Matrix in R3
+  typedef Eigen::Quaternion<scalar_t> quat;   /// Member of S4
 
   /**
    *  @brief Ctor, initializes state to all zeros.
@@ -55,21 +40,29 @@ public:
   AttitudeESKF();
 
   /**
-   *  @brief predict Perform the prediction step.
-   *  @param wg Uncorrected gyroscope readings in body frame.
-   *  @param dt Time step in seconds.
-   *  @param useRK4 If true, use RK4 integration - otherwise euler is used.
-   *
-   *  @note Integrates the nominal state using RK4.
+   * @brief predict Perform the prediction step.
+   * @param wg Uncorrected gyroscope readings in body frame.
+   * @param dt Time step in seconds.
+   * @param cov Covariance on gyro measurement, units of (rad/s)^2.
+   * @param useRK4 If true, use RK4 integration - otherwise euler is used.
    */
-  void predict(const vec3 &wg, scalar_t dt, bool useRK4=false);
+  void predict(const vec3 &wg, scalar_t dt, 
+               const mat3& cov, bool useRK4=false);
 
   /**
-   *  @brief update Perform the update step.
-   *  @param ab Accelerometer reading in body frame (units of Gs).
+   * @brief update Perform the update step.
+   * @param ab Accelerometer reading in body frame (units of m/s^2).
+   * @param aCov Covariance on accelerometer measurement, units of (m/s^2)^2.
+   * @param mb Measured magnetic field in body frame (units of guass)
+   * @param mCov Covariance on magnetometer measurement, units of gauss^2.
+   * 
+   * @note Magnetometer elements only used if usesMagnetometer is set to true.
    */
-  void update(const vec3 &ab, const vec3 &mb = vec3::Zero());
-
+  void update(const vec3 &ab,
+              const mat3 &aCov,
+              const vec3 &mb = vec3::Zero(),
+              const mat3 &mCov = mat3::Zero());
+  
   /**
    * @brief setEstimatesBias Enable/Disable bias estimation.
    * @param estBias If true, bias is estimated online.
@@ -89,12 +82,6 @@ public:
    * @param useMag If true, mag update is enabled.
    */
   void setUsesMagnetometer(bool useMag) { useMag_ = useMag; }
-
-  /**
-   * @brief setVariances Set the process/measurement variances.
-   * @param var Instance of VarSettings.
-   */
-  void setVariances(const VarSettings &var) { var_ = var; }
 
   /**
    * @brief setMagneticReference Set the magnetic reference vector.
@@ -124,8 +111,9 @@ public:
    * @brief getCovariance Get the system covariance on the error state.
    * @return 3x3 covariance matrix.
    */
-  const Eigen::Matrix<scalar_t, 3, 3> &getCovariance() const { return P_; }
-
+  const mat3 &getCovariance() const { return P_; }
+  mat3 &getCovariance() { return P_; }
+  
   /**
    * @brief getPredictedField Get the predicted magnetic field.
    * @return The predicted magnetic field for the current state, units of gauss.
@@ -162,8 +150,6 @@ private:
   bool isStable_;
   bool estBias_;
   bool useMag_;
-
-  VarSettings var_;
 };
 
 } // namespace kr

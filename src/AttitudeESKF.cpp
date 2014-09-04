@@ -9,19 +9,21 @@
  *		  Author: gareth
  */
 
+#ifndef NDEBUG
 #define NDEBUG
+#endif
 
+#include <kr_attitude_eskf/AttitudeESKF.hpp>
 #include <Eigen/LU>
+#include <iostream>
 
-#include "AttitudeESKF.hpp"
-
-using namespace std;
 using namespace Eigen;
-using namespace kr;
+
+namespace kr {
 
 //	skew symmetric matrix
 template <typename T>
-static inline Matrix<T, 3, 3> cross_skew(const Matrix<T, 3, 1> &w) {
+static inline Matrix<T, 3, 3> crossSkew(const Matrix<T, 3, 1> &w) {
   Matrix<T, 3, 3> W;
 
   W(0, 0) = 0;
@@ -117,7 +119,6 @@ static inline void integrateRungeKutta4(Eigen::Quaternion<Scalar> &q, const Eige
   const static Scalar two = static_cast<Scalar>(2);
 
   Eigen::Quaternion<Scalar> qw = q * w * half;
-
   Eigen::Quaternion<Scalar> k2 = (q + qw * dt * half) * w * half;
   Eigen::Quaternion<Scalar> k3 = (q + k2 * dt * half) * w * half;
   Eigen::Quaternion<Scalar> k4 = (q + k3 * dt) * w * half;
@@ -143,12 +144,15 @@ AttitudeESKF::AttitudeESKF()
   useMag_ = false;
 }
 
-void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb, AttitudeESKF::scalar_t dt, bool useRK4) {
+void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb,
+                           AttitudeESKF::scalar_t dt, 
+                           const AttitudeESKF::mat3 &cov,
+                           bool useRK4) {
   static const Matrix<scalar_t, 3, 3> I3 =
       Matrix<scalar_t, 3, 3>::Identity(); //  identity R3
 
-  scalar_t wb2 = wb[0]*wb[0] + wb[1]*wb[1] + wb[2]*wb[2];
-  if (wb2 < biasThresh_*biasThresh_) {
+  scalar_t wb2 = wb[0] * wb[0] + wb[1] * wb[1] + wb[2] * wb[2];
+  if (wb2 < biasThresh_ * biasThresh_) {
     steadyCount_++; //  not rotating, update moving average
 
     if (estBias_ && steadyCount_ > 20) {
@@ -161,25 +165,26 @@ void AttitudeESKF::predict(const AttitudeESKF::vec3 &wb, AttitudeESKF::scalar_t 
   w_ = (wb - b_); //	true gyro reading
 
   //	error-state jacobian
-  Matrix<scalar_t, 3, 3> F = I3 - cross_skew<scalar_t>(w_ * dt);
+  const Matrix<scalar_t, 3, 3> F = I3 - crossSkew<scalar_t>(w_ * dt);
 
   //  integrate state and covariance
-  Eigen::Quaternion<scalar_t> wQuat(0,w_[0],w_[1],w_[2]);
+  Eigen::Quaternion<scalar_t> wQuat(0, w_[0], w_[1], w_[2]);
   if (!useRK4) {
     integrateEuler(q_, wQuat, dt, true);
   } else {
-    integrateRungeKutta4(q_, wQuat, dt, true); 
+    integrateRungeKutta4(q_, wQuat, dt, true);
   }
-  
-  P_ = F * P_ * F.transpose();
 
-  for (int i = 0; i < 3; i++) {
-    P_(i, i) += var_.gyro[i];
-  }
+  //  noise jacobian
+  const Matrix <scalar_t,3,3> G = -I3 * dt;
+  P_ = F*P_*F.transpose() + G*cov*G.transpose();
 }
 
-void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3 &mb) {
-  Matrix<scalar_t, 3, 3> A;  //  for updating covariance
+void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, 
+                          const mat3 &aCov, 
+                          const AttitudeESKF::vec3 &mb, 
+                          const mat3 &mCov) {
+  Matrix<scalar_t, 3, 3> A;
 
   //  rotation matrix: world -> body
   const Matrix<scalar_t, 3, 3> bRw = q_.conjugate().matrix();
@@ -187,23 +192,19 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
   vec3 gravity;
   gravity[0] = 0.0;
   gravity[1] = 0.0;
-  gravity[2] = 1.0;
+  gravity[2] = 9.80665;
 
   //  predicted gravity vector
   const vec3 aPred = bRw * gravity;
 
   if (!useMag_) {
     //  calculate jacobian
-    Matrix<scalar_t, 3, 3> H = cross_skew(aPred);
+    Matrix<scalar_t, 3, 3> H = crossSkew(aPred);
     Matrix<scalar_t, 3, 1> r = ab - aPred;
 
     //  solve for the kalman gain
-    Matrix<scalar_t, 3, 3> S = H * P_ * H.transpose();
+    const Matrix<scalar_t, 3, 3> S = H * P_ * H.transpose() + aCov;
     Matrix<scalar_t, 3, 3> Sinv;
-
-    for (int i = 0; i < 3; i++) {
-      S(i, i) += var_.accel[i];
-    }
 
     const scalar_t det = determinant(S);
     if (std::abs(det) < static_cast<scalar_t>(1e-5)) {
@@ -225,6 +226,10 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
     vec3 field = bRw * magRef_;
     predMag_ = field;
 
+    //std::cout << "Ref: " << magRef_.transpose() << std::endl;
+    //std::cout << "Pred: " << predMag_.transpose() << std::endl;
+    ///std::cout << "Meas: " << mb.transpose() << std::endl;
+    
     Matrix<scalar_t, 6, 1> r;
     r.block<3, 1>(0, 0) = ab - aPred;
     r.block<3, 1>(3, 0) = mb - field;
@@ -233,16 +238,13 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
     H.setZero();
 
     //  jacobians for gravity and magnetic field
-    H.block<3, 3>(0, 0) = cross_skew(aPred);
-    H.block<3, 3>(3, 0) = cross_skew(field);
+    H.block<3, 3>(0, 0) = crossSkew(aPred);
+    H.block<3, 3>(3, 0) = crossSkew(field);
 
     //  covariance for both sensors
     Matrix<scalar_t, 6, 6> covR;
-    covR.setZero();
-    for (int i = 0; i < 3; i++) {
-      covR(i, i) = var_.accel[i];
-      covR(i + 3, i + 3) = var_.mag[i];
-    }
+    covR.block<3,3>(0,0) = aCov;
+    covR.block<3,3>(3,3) = mCov;
 
     const Matrix<scalar_t, 6, 6> S = H * P_ * H.transpose() + covR;
     Matrix<scalar_t, 6, 6> Sinv;
@@ -268,6 +270,9 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab, const AttitudeESKF::vec3
   //  perform state update
   P_ = (Matrix<scalar_t, 3, 3>::Identity() - A) * P_;
 
-  q_ = q_ * quat(1.0, dx_[0], dx_[1], dx_[2]);
+  q_ = q_ * quat(1.0, dx_[0]*0.5, dx_[1]*0.5, dx_[2]*0.5);
   q_.normalize();
 }
+
+} //  namespace kr
+
