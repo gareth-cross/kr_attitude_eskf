@@ -8,7 +8,8 @@ kr_attitude_eskf is an implementation of the Error-State Kalman Filter described
 
 * **0.0.7**:
   - AttitudeESKF accepts matrices for covariance parameters, instead of assuming diagonal noise.
-  - Noise parameters are not provided by `rosparam` anymore, and are expected to arrive in the incoming messages.  
+  - Noise parameters are not provided by `rosparam` anymore, and are expected to arrive in the incoming messages.
+  - Process model treats gyro covariance with the correct units (rad/s)^2 instead of (rad)^2.
   - Magnetic bias/scale/reference vectors are loaded as lists instead of key-value arrays.
   - Magnetometer calibration now uses least squares for initial guess, and LM iteration is robustified with Cauchy weighting.
   - Calibration is triggered by a callable ROS service, instead of from the launch file options.
