@@ -75,7 +75,7 @@ private:
     Calibrating = 1,
     CalibrationComplete = 2,
   } calibState_;
-  int initCount_;
+  bool init_;
   
   static_assert(std::is_same<kr::AttitudeESKF::scalar_t,double>::value,
                 "This node should only be compiled using double precision.");

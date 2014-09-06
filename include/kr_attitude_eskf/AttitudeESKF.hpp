@@ -34,6 +34,8 @@ public:
   typedef Eigen::Matrix<scalar_t, 3, 3> mat3; /// Matrix in R3
   typedef Eigen::Quaternion<scalar_t> quat;   /// Member of S4
 
+  static constexpr scalar_t kOneG = 9.80665;  /// Earth gravity
+  
   /**
    *  @brief Ctor, initializes state to all zeros.
    */
@@ -53,7 +55,7 @@ public:
    * @brief update Perform the update step.
    * @param ab Accelerometer reading in body frame (units of m/s^2).
    * @param aCov Covariance on accelerometer measurement, units of (m/s^2)^2.
-   * @param mb Measured magnetic field in body frame (units of guass)
+   * @param mb Measured magnetic field in body frame (units of gauss)
    * @param mCov Covariance on magnetometer measurement, units of gauss^2.
    * 
    * @note Magnetometer elements only used if usesMagnetometer is set to true.
@@ -62,6 +64,30 @@ public:
               const mat3 &aCov,
               const vec3 &mb = vec3::Zero(),
               const mat3 &mCov = mat3::Zero());
+  
+  /**
+   * @brief initialize Initialize the pose.
+   * 
+   * @param ab Measured body acceleration (units of m/s^2).
+   * @param aCov Diagonal uncertainty on acceleration, units of (m/s^2)^2.
+   * @param mb Measured magnetic field in body frame (units of gauss).
+   * @param mCov Diagonal uncertainty on magnetic field, units of gauss^2.
+   * @param maxIterations Max iterations during initialization.
+   * 
+   * @note Uses non-linear least squares to formulate initial rotation vector.
+   * The inverse covariance matrices are used to weight the input vectors.
+   * 
+   * @note If magnetometer is disabled, a roll and pitch angles are determined
+   * from the gravity vector. The yaw angle is zeroed.
+   * 
+   * @return True on success, false on failure. Failure will occur if aCov or
+   * mCov are not invertible (and the magnetometer is enabled).
+   */
+  bool initialize(const vec3 &ab,
+                  const vec3 &aCov,
+                  const vec3 &mb = vec3::Zero(),
+                  const vec3 &mCov = vec3::Zero(),
+                  unsigned int maxIterations = 5);
   
   /**
    * @brief setEstimatesBias Enable/Disable bias estimation.

@@ -15,6 +15,7 @@
 
 #include <kr_attitude_eskf/AttitudeESKF.hpp>
 #include <Eigen/LU>
+#include <Eigen/Cholesky>
 #include <iostream>
 
 using namespace Eigen;
@@ -130,6 +131,16 @@ static inline void integrateRungeKutta4(Eigen::Quaternion<Scalar> &q, const Eige
   }
 }
 
+template <typename Scalar>
+static inline Eigen::Matrix<Scalar,3,3> 
+rodrigues(const Eigen::Matrix<Scalar,3,1>& w) {
+  const auto norm = w.norm();
+  if (norm < std::numeric_limits<Scalar>::epsilon()*10) {
+    return Eigen::Matrix<Scalar,3,3>::Identity() + crossSkew(w);
+  }
+  return Eigen::AngleAxis<Scalar>(norm, w / norm).matrix();
+}
+
 AttitudeESKF::AttitudeESKF()
     : q_(1,0,0,0), steadyCount_(0), biasThresh_(0), isStable_(true) {
   P_.setZero();
@@ -192,7 +203,7 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
   vec3 gravity;
   gravity[0] = 0.0;
   gravity[1] = 0.0;
-  gravity[2] = 9.80665;
+  gravity[2] = kOneG;
 
   //  predicted gravity vector
   const vec3 aPred = bRw * gravity;
@@ -272,6 +283,70 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
 
   q_ = q_ * quat(1.0, dx_[0]*0.5, dx_[1]*0.5, dx_[2]*0.5);
   q_.normalize();
+}
+
+bool AttitudeESKF::initialize(const vec3 &ab,
+                              const vec3 &aCov,
+                              const vec3 &mb,
+                              const vec3 &mCov,
+                              unsigned int maxIterations) {
+  if (!useMag_) {
+    //  determine attitude angles
+    scalar_t ay = ab[1];
+    if (ay > kOneG) { ay = kOneG; }
+    else if (ay < -kOneG) { ay = -kOneG; }
+    const scalar_t& ax = ab[0];
+    const scalar_t& az = ab[2]; 
+    
+    const scalar_t phi = std::asin(-ay / kOneG);  //  roll
+    const scalar_t theta = std::atan2(ax, az);    //  pitch
+  
+    q_ = Eigen::AngleAxis<scalar_t>(theta, vec3(0,1,0)) * 
+         Eigen::AngleAxis<scalar_t>(phi, vec3(1,0,0));
+  }
+  else {
+#ifdef ATTITUDE_ESKF_BUILD_MAG
+    printf("derp derp fuck\n");
+    const static scalar_t eps(1e-6);
+    for (int i=0; i < 3; i++) {
+      if (aCov[i] < eps || mCov[i] < eps) {
+        return false;
+      }
+    }
+    //  jacobian
+    Eigen::Matrix <scalar_t,6,3> J;
+    J.block<3,3>(0,0) = crossSkew(ab);
+    J.block<3,3>(3,0) = crossSkew(mb);
+    
+    //  weight matrix
+    Eigen::Matrix <scalar_t,6,6> S;
+    S.setZero();
+    for (int i=0; i < 3; i++) {
+      S(i,i) = 1 / aCov[i];
+      S(i+3,i+3) = 1 / mCov[i];
+    }
+    
+    //  hessian
+    const mat3 H = J.transpose() * S * J;
+    const Eigen::LDLT<mat3> ldlt(H);
+    
+    //  optimize
+    vec3 w(0,0,0);
+    Matrix<scalar_t,6,1> r;
+    for (unsigned int iter=0; iter < maxIterations; iter++) {
+      const mat3 W = rodrigues(w);
+      //  residuals
+      r.block<3,1>(0,0) = (W * vec3(0,0,kOneG)) - ab;
+      r.block<3,1>(3,0) = (W * magRef_) - mb;
+      //  step
+      w.noalias() += ldlt.solve(J.transpose() * S * r);
+    }
+    q_ = quat(rodrigues(w).transpose());
+    printf("done: %f, %f, %f\n", w[0], w[1], w[2]);
+#endif
+  }
+  
+  return true;
 }
 
 } //  namespace kr

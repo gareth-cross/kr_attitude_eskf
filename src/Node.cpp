@@ -20,7 +20,7 @@ namespace kr_attitude_eskf {
 
 Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh), 
   sync_(TimeSyncPolicy(kROSQueueSize), subImu_, subField_), 
-  calibState_(Uncalibrated), initCount_(0) {
+  calibState_(Uncalibrated), init_(false) {
  
   //  load settings
   nh_.param("enable_magnetometer", enableMag_, false);
@@ -96,7 +96,6 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   //  configure filter
   eskf_.setEstimatesBias(true);
   eskf_.setGyroBiasThreshold(gyroBiasThresh_);
-  initCount_ = 100;
 }
 
 void Node::saveCalibration() {
@@ -160,14 +159,18 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
   }
   
   if (prevStamp_.sec != 0) {
+    if (!init_) {
+      const kr::vec3d aCovDiag(aCov(0,0),aCov(1,1),aCov(2,2));
+      const kr::vec3d mCovDiag(mCov(0,0),mCov(1,1),mCov(2,2));
+      eskf_.initialize(am,aCovDiag,mm,mCovDiag);
+      eskf_.getCovariance() = kr::mat3d::Identity()*5;  //  large uncertainty
+      init_ = true;
+      ROS_INFO("Initialized ESKF");
+    }
+    
     //  run kalman filter
     const double delta = imuMsg->header.stamp.toSec() - prevStamp_.toSec();
     eskf_.predict(wm, delta, wCov);
-    if (initCount_ > 0) {
-      //  inject artificial covariance in our state
-      eskf_.getCovariance() += kr::mat3d::Identity();
-      initCount_--;
-    }
     eskf_.update(am, aCov, mm, mCov);
     
     const kr::quatd wQb = eskf_.getQuat();          // updated quaternion
@@ -198,9 +201,6 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
             //  done, we can use this new calibration immediately
             calibState_ = CalibrationComplete;
             enableMag_ = true;
-            //  add some variance to our state estimate so the mag correction
-            //  takes effect
-            initCount_ = 50;
           }
           catch (std::exception& e) {
             ROS_ERROR("Calibration failed: %s", e.what());    
@@ -238,10 +238,10 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     pose.header = imu.header;
     pose.pose.orientation = imu.orientation;
     
-    sensor_msgs::MagneticField field = *magMsg;
-    field.header.seq = 0;
-    tf::vectorEigenToMsg(mm, field.magnetic_field);
     if (enableMag_) {
+      sensor_msgs::MagneticField field = *magMsg;
+      field.header.seq = 0;
+      tf::vectorEigenToMsg(mm, field.magnetic_field);
       pubField_.publish(field);
     }
     
