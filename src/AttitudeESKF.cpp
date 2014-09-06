@@ -306,7 +306,6 @@ bool AttitudeESKF::initialize(const vec3 &ab,
   }
   else {
 #ifdef ATTITUDE_ESKF_BUILD_MAG
-    printf("derp derp fuck\n");
     const static scalar_t eps(1e-6);
     for (int i=0; i < 3; i++) {
       if (aCov[i] < eps || mCov[i] < eps) {
@@ -342,7 +341,6 @@ bool AttitudeESKF::initialize(const vec3 &ab,
       w.noalias() += ldlt.solve(J.transpose() * S * r);
     }
     q_ = quat(rodrigues(w).transpose());
-    printf("done: %f, %f, %f\n", w[0], w[1], w[2]);
 #endif
   }
   
