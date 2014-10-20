@@ -9,7 +9,7 @@
   <arg name="field_topic" default="/imu/magnetic_field"/>
 
   <!-- Enable magnetometer -->
-  <arg name="enable_magnetometer" default="false"/>
+  <arg name="enable_magnetometer" default="true"/>
 
   <!-- Calibrate magnetometer on launch -->
   <arg name="calibrate_magnetometer" default="none"/>

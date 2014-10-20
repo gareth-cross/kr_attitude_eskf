@@ -169,8 +169,8 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
   
   for (const std::pair<int,SampleBin>& p : binH_) {
     const kr::mat3d wRb = p.second.q.matrix();
-    const kr::vec3d rpy = kr::getRPY(wRb);
-    const kr::mat3d tilt = kr::rotation_y(rpy[1]) * kr::rotation_x(rpy[0]);
+    const kr::vec3d rpy = kr::rotToEulerZYX(wRb);
+    const kr::mat3d tilt = kr::rotY(rpy[1]) * kr::rotX(rpy[0]);
     kr::vec3d level = tilt * p.second.field;
         
     level -= bias_;

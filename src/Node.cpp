@@ -146,6 +146,17 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
   }
   wCov *= processScaleFactor_;  //  apply fudge factor
   
+  //  temp debug stuff
+//  static FILE * dump = 0;
+//  if (!dump) {
+//    dump = fopen("/home/gareth/output.csv", "w");
+//    if (!dump) {
+//      std::cout << "Failed to open file!\n";
+//    }
+//  } else {
+//    fprintf(dump, "%.6f, %.6f, %.6f\n", mm[0], mm[1], mm[2]);
+//  }
+    
   if (enableMag_ && calibState_==CalibrationComplete) {
     //  correct magnetic field
     mm.noalias() -= magBias_;
