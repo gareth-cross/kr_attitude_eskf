@@ -6,6 +6,10 @@ kr_attitude_eskf is an implementation of the Error-State Kalman Filter described
 
 ## Version History
 
+* **0.0.8**:
+ - Removed the reference calib option, which produced somewhat poor results anyways.
+ - Mag calib code now uses either float or double.
+ - Removed kr_math, eigen_conversions dependencies.
 * **0.0.7**:
   - AttitudeESKF accepts matrices for covariance parameters, instead of assuming diagonal noise.
   - Noise parameters are not provided by `rosparam` anymore, and are expected to arrive in the incoming messages.

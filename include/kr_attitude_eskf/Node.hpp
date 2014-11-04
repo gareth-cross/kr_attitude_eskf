@@ -22,7 +22,6 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/exact_time.h>
 
-#include <kr_math/base_types.hpp>
 #include <kr_attitude_eskf/AttitudeESKF.hpp>
 #include <kr_attitude_eskf/AttitudeMagCalib.hpp>
 
@@ -36,6 +35,8 @@ public:
   void saveCalibration();
   
 private:
+  typedef kr::AttitudeESKF::vec3 vec3;
+  
   static constexpr unsigned int kROSQueueSize = 100;
   
   ros::NodeHandle nh_;
@@ -64,9 +65,9 @@ private:
   double processScaleFactor_;
   
   //  implementation
-  kr::vec3d magBias_;
-  kr::vec3d magScale_;
-  kr::vec3d magReference_;
+  vec3 magBias_;
+  vec3 magScale_;
+  vec3 magReference_;
   kr::AttitudeESKF eskf_;
   kr::AttitudeMagCalib calib_;
   ros::Time prevStamp_;
@@ -76,9 +77,6 @@ private:
     CalibrationComplete = 2,
   } calibState_;
   bool init_;
-  
-  static_assert(std::is_same<kr::AttitudeESKF::scalar_t,double>::value,
-                "This node should only be compiled using double precision.");
   
   //  callbacks
   void inputCallback(const sensor_msgs::ImuConstPtr&,

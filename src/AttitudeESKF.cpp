@@ -288,8 +288,7 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
 bool AttitudeESKF::initialize(const vec3 &ab,
                               const vec3 &aCov,
                               const vec3 &mb,
-                              const vec3 &mCov,
-                              unsigned int maxIterations) {
+                              const vec3 &mCov) {
   if (!useMag_) {
     //  determine attitude angles
     scalar_t ay = ab[1];
@@ -332,7 +331,7 @@ bool AttitudeESKF::initialize(const vec3 &ab,
     //  optimize
     vec3 w(0,0,0);
     Matrix<scalar_t,6,1> r;
-    for (unsigned int iter=0; iter < maxIterations; iter++) {
+    for (unsigned int iter=0; iter < 5; iter++) {
       const mat3 W = rodrigues(w);
       //  residuals
       r.block<3,1>(0,0) = (W * vec3(0,0,kOneG)) - ab;
@@ -343,6 +342,9 @@ bool AttitudeESKF::initialize(const vec3 &ab,
     q_ = quat(rodrigues(w).transpose());
 #endif
   }
+  //  start w/ a large uncertainty
+  P_.setIdentity();
+  P_ *= M_PI*M_PI;
   
   return true;
 }

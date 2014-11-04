@@ -12,8 +12,6 @@
 #include <kr_attitude_eskf/Node.hpp>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <eigen_conversions/eigen_msg.h>
-#include <kr_math/SO3.hpp>
 #include <assert.h>
 
 namespace kr_attitude_eskf {
@@ -29,13 +27,15 @@ Node::Node(const ros::NodeHandle &nh, const ros::NodeHandle &pnh) : nh_(pnh),
   //  load magnetometer calibration
   magBias_.setZero();
   magScale_.setConstant(1);
-  magReference_.setZero();
+  magReference_ << 0, 0.205779, -0.478950;  //  default to Philadelphia
   if (enableMag_) {
     try {
       std::vector<double> biasVec, scaleVec, refVec;
       nh_.getParam("mag_calib/bias", biasVec);
       nh_.getParam("mag_calib/scale", scaleVec);
-      nh_.getParam("mag_calib/reference", refVec);
+      if (nh_.hasParam("mag_calib/reference")) {
+        nh_.getParam("mag_calib/reference", refVec);
+      }
       if (biasVec.size() != 3 || scaleVec.size() != 3 || refVec.size() != 3) {
         throw std::invalid_argument("List w/ invalid size in mag_calib.");
       }
@@ -108,10 +108,6 @@ void Node::saveCalibration() {
   vec[1] = magScale_[1];
   vec[2] = magScale_[2];
   nh_.setParam("mag_calib/scale", vec);
-  vec[0] = magReference_[0];
-  vec[1] = magReference_[1];
-  vec[2] = magReference_[2];
-  nh_.setParam("mag_calib/reference", vec);
 }
 
 void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
@@ -120,19 +116,22 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     assert(magMsg);
   }
   
-  kr::vec3d wm; //  measured angular rate
-  kr::vec3d am; //  measured acceleration
-  kr::vec3d mm; //  measured magnetic field
-
-  //std::cout << mm.transpose() << std::endl;
+  vec3 wm;        //  measured angular rate
+  vec3 am;        //  measured acceleration
+  vec3 mm(0,0,0); //  measured magnetic field
   
-  tf::vectorMsgToEigen(imuMsg->angular_velocity, wm);
-  tf::vectorMsgToEigen(imuMsg->linear_acceleration, am);
+  wm = vec3(imuMsg->angular_velocity.x,
+            imuMsg->angular_velocity.y,
+            imuMsg->angular_velocity.z);
+  am = vec3(imuMsg->linear_acceleration.x,
+            imuMsg->linear_acceleration.y,
+            imuMsg->linear_acceleration.z);
   if (magMsg) {
-    tf::vectorMsgToEigen(magMsg->magnetic_field, mm);
-  } else {
-    mm.setZero();
+    mm = vec3(magMsg->magnetic_field.x,
+              magMsg->magnetic_field.y,
+              magMsg->magnetic_field.z);
   }
+  
   //  copy covariances from message to matrix
   kr::AttitudeESKF::mat3 wCov, aCov, mCov = kr::AttitudeESKF::mat3::Zero();
   for (int i=0; i < 3; i++) {
@@ -145,17 +144,6 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     }
   }
   wCov *= processScaleFactor_;  //  apply fudge factor
-  
-  //  temp debug stuff
-//  static FILE * dump = 0;
-//  if (!dump) {
-//    dump = fopen("/home/gareth/output.csv", "w");
-//    if (!dump) {
-//      std::cout << "Failed to open file!\n";
-//    }
-//  } else {
-//    fprintf(dump, "%.6f, %.6f, %.6f\n", mm[0], mm[1], mm[2]);
-//  }
     
   if (enableMag_ && calibState_==CalibrationComplete) {
     //  correct magnetic field
@@ -171,21 +159,20 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
   
   if (prevStamp_.sec != 0) {
     if (!init_) {
-      const kr::vec3d aCovDiag(aCov(0,0),aCov(1,1),aCov(2,2));
-      const kr::vec3d mCovDiag(mCov(0,0),mCov(1,1),mCov(2,2));
+      const vec3 aCovDiag(aCov(0,0),aCov(1,1),aCov(2,2));
+      const vec3 mCovDiag(mCov(0,0),mCov(1,1),mCov(2,2));
       eskf_.initialize(am,aCovDiag,mm,mCovDiag);
-      eskf_.getCovariance() = kr::mat3d::Identity()*5;  //  large uncertainty
       init_ = true;
       ROS_INFO("Initialized ESKF");
     }
     
     //  run kalman filter
-    const double delta = imuMsg->header.stamp.toSec() - prevStamp_.toSec();
+    const double delta = (imuMsg->header.stamp - prevStamp_).toSec();
     eskf_.predict(wm, delta, wCov);
     eskf_.update(am, aCov, mm, mCov);
     
-    const kr::quatd wQb = eskf_.getQuat();          // updated quaternion
-    const kr::vec3d w = eskf_.getAngularVelocity(); // ang vel. minus bias
+    const kr::AttitudeESKF::quat wQb = eskf_.getQuat();
+    const vec3 w = eskf_.getAngularVelocity(); // ang vel. minus bias
    
     if (calibState_ == Calibrating) {
       //  update the calibrator
@@ -199,11 +186,9 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
             
             ROS_INFO_STREAM("Bias: " << calib_.getBias().transpose());
             ROS_INFO_STREAM("Scale: " << calib_.getScale().transpose());
-            ROS_INFO_STREAM("Reference: " << calib_.getReference().transpose());
             
             magBias_ = calib_.getBias();
             magScale_ = calib_.getScale();
-            magReference_ = calib_.getReference();
             
             //  save to rosparam
             nh_.setParam("enable_magnetometer", true);
@@ -219,18 +204,13 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
         }
       }
     }
-
-//    const kr::vec3d derot = eskf_.getPredictedField();
-//    static ros::Publisher pubDebug = nh_.advertise<geometry_msgs::Vector3Stamped>("predicted", 1);
-//    geometry_msgs::Vector3Stamped vec;
-//    tf::vectorEigenToMsg(derot, vec.vector);
-//    vec.header.stamp = imuMsg->header.stamp;
-//    pubDebug.publish(vec);
     
     sensor_msgs::Imu imu = *imuMsg;
     imu.header.seq = 0;
     
-    tf::vectorEigenToMsg(w,imu.angular_velocity);
+    imu.angular_velocity.x = w[0];
+    imu.angular_velocity.y = w[1];
+    imu.angular_velocity.z = w[2];
     imu.orientation.w = wQb.w();
     imu.orientation.x = wQb.x();
     imu.orientation.y = wQb.y();
@@ -243,7 +223,9 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     }
     geometry_msgs::Vector3Stamped bias;
     bias.header = imu.header;
-    tf::vectorEigenToMsg(eskf_.getGyroBias(),bias.vector);
+    bias.vector.x = eskf_.getGyroBias()[0];
+    bias.vector.y = eskf_.getGyroBias()[1];
+    bias.vector.z = eskf_.getGyroBias()[2];
     //  pose with no position
     geometry_msgs::PoseStamped pose;
     pose.header = imu.header;
@@ -252,7 +234,9 @@ void Node::inputCallback(const sensor_msgs::ImuConstPtr& imuMsg,
     if (enableMag_) {
       sensor_msgs::MagneticField field = *magMsg;
       field.header.seq = 0;
-      tf::vectorEigenToMsg(mm, field.magnetic_field);
+      field.magnetic_field.x = mm[0];
+      field.magnetic_field.y = mm[1];
+      field.magnetic_field.z = mm[2];
       pubField_.publish(field);
     }
     

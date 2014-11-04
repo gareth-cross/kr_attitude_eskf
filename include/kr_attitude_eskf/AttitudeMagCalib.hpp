@@ -14,22 +14,27 @@
 
 #include <map>
 #include <vector>
-#include <kr_math/base_types.hpp>
+#include "kr_attitude_eskf/AttitudeESKF.hpp"
 
 namespace kr {
 
 /**
- *  @class AttitudeMagCalib
- *  @brief Tool for calibrating the system magnetometer.
+ * @class AttitudeMagCalib
+ * @brief Tool for calibrating the system magnetometer.
  */
 class AttitudeMagCalib {
 public:
+  /// Types
+  typedef kr::AttitudeESKF::scalar_t scalar_t;
+  typedef kr::AttitudeESKF::vec3 vec3;
+  typedef kr::AttitudeESKF::mat3 mat3;
+  typedef kr::AttitudeESKF::quat quat;
+  
   /**
    * @brief Types of calibration that can be performed.
    */
   enum CalibrationType : int {
-    FullCalibration = 0,      /// Calculate bias, scale and reference
-    ReferenceCalibration = 1, /// Calibrate only North reference vector
+    FullCalibration = 0,      /// Calculate bias and scale
   };
 
   /**
@@ -57,7 +62,7 @@ public:
    * @param att Current attitude at time of measurement.
    * @param field Current magnetic field.
    */
-  void appendSample(const kr::quatd &att, const Eigen::Vector3d &field);
+  void appendSample(const quat &att, const vec3 &field);
 
   /**
    * @brief isReady Is the system ready to calibrate?
@@ -72,46 +77,42 @@ public:
   bool isCalibrated() const;
 
   /**
-   * @brief calibrate
-   * @throws
+   * @brief Run calibration on data recorded.
+   * @throws insufficient_data, singular_hessian
+   * 
+   * @note This method will optimize the scale and bias parameters using
+   * a two step process:
+   *  1) Least-squares fit of a sphere as an initial guess.
+   *  2) LM fit of an axis-aligned spheroid as a refined estimate.
    */
-  void calibrate(AttitudeMagCalib::CalibrationType type);
+  void calibrate(AttitudeMagCalib::CalibrationType type = FullCalibration);
 
   /**
    * @brief getBias Get the estimate of magnetometer bias.
    * @return Vector in R3, units of gauss.
    */
-  const Eigen::Vector3d& getBias() const { return bias_; }
+  const vec3& getBias() const { return bias_; }
 
   /**
    * @brief getScale Get the estimate of magnetometer scale.
    * @return Vector in R3, unitless.
    */
-  const Eigen::Vector3d& getScale() const { return scale_; }
-
-  /**
-   * @brief getReference Get the magnetic north vector.
-   * @return Vector in R3, units of gauss.
-   *
-   * @note The north reference vector corresponds to the vector [H 0 V], where H is the horizontal component of the B-field, and V the vertical component.
-   */
-  const Eigen::Vector3d& getReference() const { return ref_; }
+  const vec3& getScale() const { return scale_; }
 
 private:
   constexpr static int kBinMaxCount = 40;   /// Number of samples to take on each axis
 
   struct SampleBin {
-    Eigen::Vector3d field; ///  Field measured in this sample
-    kr::quatd q;           ///  Unreferenced quaternion for this sample
+    vec3 field; ///  Field measured in this sample
+    quat q;     ///  Unreferenced quaternion for this sample
   };
 
   std::map<int, SampleBin> binV_;
   std::map<int, SampleBin> binH_;
   bool calibrated_;
 
-  Eigen::Vector3d bias_;
-  Eigen::Vector3d scale_;
-  Eigen::Vector3d ref_;
+  vec3 bias_;
+  vec3 scale_;
 };
 
 } // namespace kr

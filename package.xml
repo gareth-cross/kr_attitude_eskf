@@ -17,7 +17,6 @@
   <build_depend>message_filters</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>eigen_conversions</build_depend>
-  <build_depend>kr_math</build_depend>
   <build_depend>diagnostic_updater</build_depend>
 
   <run_depend>geometry_msgs</run_depend>
@@ -27,7 +26,6 @@
   <run_depend>message_filters</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>eigen_conversions</run_depend>
-  <run_depend>kr_math</run_depend>
   <run_depend>diagnostic_updater</run_depend>
 
   <export>

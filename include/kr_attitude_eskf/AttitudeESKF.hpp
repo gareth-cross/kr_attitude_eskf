@@ -72,7 +72,6 @@ public:
    * @param aCov Diagonal uncertainty on acceleration, units of (m/s^2)^2.
    * @param mb Measured magnetic field in body frame (units of gauss).
    * @param mCov Diagonal uncertainty on magnetic field, units of gauss^2.
-   * @param maxIterations Max iterations during initialization.
    * 
    * @note Uses non-linear least squares to formulate initial rotation vector.
    * The inverse covariance matrices are used to weight the input vectors.
@@ -86,13 +85,13 @@ public:
   bool initialize(const vec3 &ab,
                   const vec3 &aCov,
                   const vec3 &mb = vec3::Zero(),
-                  const vec3 &mCov = vec3::Zero(),
-                  unsigned int maxIterations = 5);
+                  const vec3 &mCov = vec3::Zero());
   
   /**
    * @brief setEstimatesBias Enable/Disable bias estimation.
    * @param estBias If true, bias is estimated online.
-   * @note Biases are estimated with a moving average filter when the platform is not in motion.
+   * @note Biases are estimated with a moving average filter when the platform 
+   * is not in motion.
    */
   void setEstimatesBias(bool estBias) { estBias_ = estBias; }
 

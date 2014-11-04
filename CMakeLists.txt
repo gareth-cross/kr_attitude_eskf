@@ -7,9 +7,11 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   message_generation
   eigen_conversions
-  kr_math
   diagnostic_updater
 )
+
+find_package(cmake_modules)
+find_package(Eigen REQUIRED)
 
 catkin_package(
   CATKIN_DEPENDS message_runtime
@@ -23,6 +25,7 @@ include_directories(${Boost_INCLUDE_DIR})
 # include headers
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
   include
 )
 
