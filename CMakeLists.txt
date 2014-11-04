@@ -27,6 +27,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
   include
+  include/kr_attitude_eskf
 )
 
 # build shared library
