@@ -1,7 +1,7 @@
 /*
  * AttitudeESKF.cpp
  *
- *  Copyright (c) 2013 Gareth Cross. All rights reserved.
+ *  Copyright (c) 2013 Gareth Cross. Apache 2 License.
  *
  *  This file is part of kr_attitude_eskf.
  *
@@ -13,10 +13,11 @@
 #define NDEBUG
 #endif
 
-#include <kr_attitude_eskf/AttitudeESKF.hpp>
+#include "AttitudeESKF.hpp"
 #include <Eigen/LU>
 #include <Eigen/Cholesky>
 #include <iostream>
+#include <cmath>
 
 using namespace Eigen;
 
@@ -152,6 +153,7 @@ AttitudeESKF::AttitudeESKF()
   predMag_.setZero();
 
   estBias_ = false;
+  ignoreZ_ = false;
   useMag_ = false;
 }
 
@@ -236,10 +238,6 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
     //  m-field prediction
     vec3 field = bRw * magRef_;
     predMag_ = field;
-
-    //std::cout << "Ref: " << magRef_.transpose() << std::endl;
-    //std::cout << "Pred: " << predMag_.transpose() << std::endl;
-    ///std::cout << "Meas: " << mb.transpose() << std::endl;
     
     Matrix<scalar_t, 6, 1> r;
     r.block<3, 1>(0, 0) = ab - aPred;
@@ -277,12 +275,37 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
     A.setZero();
 #endif
   }
+  
+  if (ignoreZ_) {
+    //  cancel body-frame z update
+    dx_[2] = 0;
+  }
 
   //  perform state update
   P_ = (Matrix<scalar_t, 3, 3>::Identity() - A) * P_;
 
-  q_ = q_ * quat(1.0, dx_[0]*0.5, dx_[1]*0.5, dx_[2]*0.5);
+  q_ = q_ * quat(1, dx_[0]/2, dx_[1]/2, dx_[2]/2);
   q_.normalize();
+}
+  
+void AttitudeESKF::externalYawUpdate(scalar_t yaw, scalar_t alpha) {
+  //  check if we are near the hover state
+  const Matrix<scalar_t,3,3> wRb = q_.matrix();
+  Matrix<scalar_t,3,1> g;
+  g[0] = 0;
+  g[1] = 0;
+  g[2] = 1;
+  
+  g = wRb.transpose() * g;
+  if (g[2] > 0.85) {
+    //  break into roll pitch yaw
+    Matrix<scalar_t,3,1> rpy = getRPY(wRb);
+    //  interpolate between prediction and estimate
+    rpy[2] = rpy[2]*(1-alpha) + yaw*alpha;
+    q_ = Eigen::AngleAxis<scalar_t>(rpy[2],vec3(0,0,1)) *
+    Eigen::AngleAxis<scalar_t>(rpy[1],vec3(0,1,0)) *
+    Eigen::AngleAxis<scalar_t>(rpy[0],vec3(1,0,0));
+  }
 }
 
 bool AttitudeESKF::initialize(const vec3 &ab,
@@ -304,6 +327,8 @@ bool AttitudeESKF::initialize(const vec3 &ab,
          Eigen::AngleAxis<scalar_t>(phi, vec3(1,0,0));
   }
   else {
+    ///  @todo: This is kind of ugly, find some simpler mechanism to do this.
+    
 #ifdef ATTITUDE_ESKF_BUILD_MAG
     const static scalar_t eps(1e-6);
     for (int i=0; i < 3; i++) {
@@ -347,6 +372,33 @@ bool AttitudeESKF::initialize(const vec3 &ab,
   P_ *= M_PI*M_PI;
   
   return true;
+}
+  
+AttitudeESKF::vec3 AttitudeESKF::getRPY(const mat3& R) {
+  vec3 rpy;
+  scalar_t sth = -R(2, 0);
+  if (sth > 1) {
+    sth = 1;
+  } else if (sth < -1) {
+    sth = -1;
+  }
+  
+  const scalar_t theta = std::asin(sth);
+  const scalar_t cth = std::sqrt(1 - sth*sth);
+  
+  scalar_t phi, psi;
+  if (cth < static_cast<scalar_t>(1.0e-6)) {
+    phi = std::atan2(R(0, 1), R(1, 1));
+    psi = 0;
+  } else {
+    phi = std::atan2(R(2, 1), R(2, 2));
+    psi = std::atan2(R(1, 0), R(0, 0));
+  }
+  
+  rpy[0] = phi;    //  x, [-pi,pi]
+  rpy[1] = theta;  //  y, [-pi/2,pi/2]
+  rpy[2] = psi;    //  z, [-pi,pi]
+  return rpy;
 }
 
 } //  namespace kr

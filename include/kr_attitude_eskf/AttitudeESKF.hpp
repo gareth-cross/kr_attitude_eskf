@@ -1,7 +1,7 @@
 /*
  * AttitudeESKF.hpp
  *
- *  Copyright (c) 2013 Gareth Cross. All rights reserved.
+ *  Copyright (c) 2013 Gareth Cross. Apache 2 License.
  *
  *  This file is part of kr_attitude_eskf.
  *
@@ -66,6 +66,19 @@ public:
               const mat3 &mCov = mat3::Zero());
   
   /**
+   * @brief externalYawUpdate Update the z-axis rotation with an external
+   * value.
+   * @param yaw Yaw angle as the measurement.
+   * @param alpha Interpolation fraction between current and external value.
+   *
+   * @note This method was added for use in Vicon, where only one external
+   * angle is used. A complementary filter action is used for this update.
+   *
+   * The update only takes place if the dip angle is ~ below 30 degrees.
+   */
+  void externalYawUpdate(scalar_t yaw, scalar_t alpha = 0.5);
+  
+  /**
    * @brief initialize Initialize the pose.
    * 
    * @param ab Measured body acceleration (units of m/s^2).
@@ -89,7 +102,7 @@ public:
   
   /**
    * @brief setEstimatesBias Enable/Disable bias estimation.
-   * @param estBias If true, bias is estimated online.
+   * @param estBias If true, bias is estimated online. Default false.
    * @note Biases are estimated with a moving average filter when the platform 
    * is not in motion.
    */
@@ -103,8 +116,14 @@ public:
   void setGyroBiasThreshold(scalar_t thresh) { biasThresh_ = thresh; }
 
   /**
+   * @brief setIgnoresZUpdate Enable/disable zeroing the z-axis update.
+   * @param ignoreZ If true, updates about the local z-axis are ignored.
+   */
+  void setIgnoresZUpdate(bool ignoreZ) { ignoreZ_ = ignoreZ; }
+  
+  /**
    * @brief setUsesMagnetometer Enable/disable magnetometer update.
-   * @param useMag If true, mag update is enabled.
+   * @param useMag If true, mag update is enabled. Default false.
    */
   void setUsesMagnetometer(bool useMag) { useMag_ = useMag; }
 
@@ -157,6 +176,13 @@ public:
    */
   bool isStable() const { return isStable_; }
 
+  /**
+   * @brief getRPY Utility function, get roll-pitch-yaw.
+   * @param R 3x3 rotation matrix (body to world).
+   * @return Rotations about the x-y-z axes.
+   */
+  static vec3 getRPY(const mat3& R);
+  
 private:
     
   quat q_; /// Orientation
@@ -174,6 +200,7 @@ private:
 
   bool isStable_;
   bool estBias_;
+  bool ignoreZ_;
   bool useMag_;
 };
 
