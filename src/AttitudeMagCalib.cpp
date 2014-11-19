@@ -110,7 +110,7 @@ void AttitudeMagCalib::calibrate(AttitudeMagCalib::CalibrationType type) {
     //  refine with GN-NLS
     Matrix<scalar_t, Eigen::Dynamic, 6> J(N, 6);
     Matrix<scalar_t, Eigen::Dynamic, 1> r(N, 1);
-    Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic> W;
+    Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic> W(N,N);
     W.setZero();
 
     for (int iter = 0; iter < 20; iter++) {

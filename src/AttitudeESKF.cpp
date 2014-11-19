@@ -252,6 +252,7 @@ void AttitudeESKF::update(const AttitudeESKF::vec3 &ab,
 
     //  covariance for both sensors
     Matrix<scalar_t, 6, 6> covR;
+    covR.setZero();
     covR.block<3,3>(0,0) = aCov;
     covR.block<3,3>(3,3) = mCov;
 
