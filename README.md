@@ -90,4 +90,7 @@ Please report issues to the official package maintainer.
 
 ## Links
 
-Demo: [Early version running on iOS](http://www.youtube.com/watch?v=ijK2ndEGBXA)
+* [Early version running on iOS](http://www.youtube.com/watch?v=ijK2ndEGBXA)
+* Avik De has used this filter on STM32 w/ MPU6000: [Details](http://avikde.me/IMU-Filtering-STM32-MPU6000/)
+* [Video of a pico-quadrotor using ESKF](http://www.youtube.com/watch?v=HpO8DpeYC2k&spfreload=10)
+
