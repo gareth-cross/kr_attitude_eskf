@@ -1,5 +1,9 @@
 # kr_attitude_eskf
 
+**DISCLAIMER**: I authored this repo some time ago. I no longer consider it a good reference implementation of an attitude filter. Were I to re-write it today the code would look different in many respects. It is entirely plausible that there are mistakes in the current implementation. The code is not maintained, nor is it unit-tested to the standard I would now demand. I would encourage developers to look elsewhere for a better example.
+
+___
+
 kr_attitude_eskf is an implementation of the Error-State Kalman Filter described in:
 
 * “Attitude Error Representations for Kalman Filtering” - F. Landis Markley
